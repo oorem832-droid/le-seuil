@@ -1,0 +1,18 @@
+{
+  "name": "le-seuil",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "seed": "node scripts/generate-seed.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.75.0"
+  },
+  "devDependencies": {
+    "vite": "5.4.20"
+  }
+}

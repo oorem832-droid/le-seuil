@@ -1,0 +1,114 @@
+// LE SEUIL — routeur, délégation d'événements et démarrage.
+import { $, toast } from "./ui/util.js";
+import { ui, actions, forms, inputs, changes, hooks } from "./ui/state.js";
+import * as P from "./ui/public.js";
+import * as M from "./ui/member.js";
+import * as K from "./ui/coach.js";
+import * as AD from "./ui/admin.js";
+import * as store from "./store.js";
+import { S, C } from "./store.js";
+import { stopBreath } from "./ui/exercises.js";
+
+let current = location.hash.slice(1) || "accueil";
+
+function go(r){
+  current = r;
+  try { history.pushState(null, "", "#" + r); } catch(e) {}
+  $("#mainnav")?.classList.remove("open");
+  render(true);
+}
+window.addEventListener("popstate", () => { current = location.hash.slice(1) || "accueil"; render(true); });
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1) || "accueil"; if (h !== current) { current = h; render(true); } });
+
+const MEMBER = { espace: M.mDash, demarrer: M.mOnboarding, lecons: M.mLessons, exercices: M.mExercises, journal: M.mJournal, objectifs: M.mGoals,
+  evolution: M.mProgress, plan: M.mPlan, outils: M.mTools, coach: M.mCoach, compte: M.mAccount };
+const COACH = { accompagnante: K.cDash, "accompagnante-participants": K.cParticipants, "accompagnante-messages": K.cMessages, "accompagnante-agenda": K.cAgenda };
+
+function page(r){
+  let m;
+  ui.params = [];
+  if (r === "accueil") return P.pHome();
+  if (r === "decouvrir") return P.pDiscover();
+  if (r === "programmes") return P.pProgrammes();
+  if ((m = r.match(/^programme-(.+)$/))) return P.pProgramme(m[1]);
+  if (r === "bibliotheque") return P.pLibrary();
+  if ((m = r.match(/^sujet-(.+)$/))) return P.pTopic(m[1]);
+  if ((m = r.match(/^article-(.+)$/))) return P.pArticle(m[1]);
+  if (r === "faq") return P.pFAQ();
+  if (r === "contact") return P.pContact();
+  if (r === "aide" || r === "urgence") return P.pHelp();
+  if (P.isLegal(r)) return P.pLegal(r);
+  if (r === "nouveau-mot-de-passe") return P.pNewPassword();
+  if (r === "connexion") return S.user ? redirect(P.homeRoute()) : P.pLogin();
+
+  // Espace accompagnante
+  if (r.startsWith("accompagnante")) {
+    if (!store.isCoach()) return S.user ? redirect(P.homeRoute()) : redirect("connexion");
+    if ((m = r.match(/^accompagnante-p-(.+)$/))) return K.cParticipant(m[1]);
+    return (COACH[r] || K.cDash)();
+  }
+  // Administration
+  if (r.startsWith("admin") || r.startsWith("apercu")) {
+    if (!store.isStaff()) return S.user ? redirect(P.homeRoute()) : redirect("connexion");
+    if ((m = r.match(/^apercu-(\d+)-(\d+)$/))) { ui.route = "apercu"; ui.params = [+m[1], +m[2]]; return M.mPlayer(+m[1], +m[2], true); }
+    if ((m = r.match(/^admin-programme-(.+)$/))) return AD.aProgramme(m[1]);
+    if ((m = r.match(/^admin-semaine-(.+)-(\d+)$/))) { ui.params = [m[1], +m[2]]; return AD.aWeek(m[1], +m[2]); }
+    if ((m = r.match(/^admin-etape-(.+)-(\d+)-(?:new-(\w+)|(\d+))$/))) { ui.params = [m[1], +m[2]]; return AD.aStep(m[1], +m[2], m[3] ? "new" : m[4], m[3]); }
+    return AD.aMain();
+  }
+  // Espace participant
+  if (MEMBER[r] || r.startsWith("semaine-")) {
+    if (!S.user) return redirect("connexion");
+    if (store.isCoach()) return redirect("accompagnante");
+    if (store.isStaff() && !S.enrolment) return redirect("admin");
+    if ((m = r.match(/^semaine-(\d+)-(\d+)$/))) { ui.route = "semaine"; ui.params = [+m[1], +m[2]]; return M.mPlayer(+m[1], +m[2]); }
+    return MEMBER[r]();
+  }
+  return redirect("accueil");
+}
+function redirect(r){ current = r; try { history.replaceState(null, "", "#" + r); } catch(e) {} ui.route = r; return page(r); }
+
+function render(navigated = false){
+  stopBreath();
+  ui.route = current;
+  const html = page(current);
+  $("#app").innerHTML = P.header() + `<main id="main" tabindex="-1">${html}</main>` + P.footer();
+  if (navigated) {
+    window.scrollTo(0, 0);
+    ui.missing = {}; ui.confirm = null;
+    const h = document.querySelector("main h1, main h2"); if (h) { h.setAttribute("tabindex", "-1"); h.focus({ preventScroll: true }); }
+  }
+}
+function rerender(){
+  const y = window.scrollY, ae = document.activeElement, id = ae?.id, sel = ae && "selectionStart" in ae ? [ae.selectionStart, ae.selectionEnd] : null;
+  render(false);
+  window.scrollTo(0, y);
+  if (id) { const el = document.getElementById(id); if (el) { el.focus({ preventScroll: true }); if (sel) try { el.setSelectionRange(...sel); } catch(e) {} } }
+}
+hooks.render = render; hooks.rerender = rerender; hooks.go = go;
+
+/* ---------- Délégation d'événements ---------- */
+actions["burger"] = (b) => { const n = $("#mainnav"); n.classList.toggle("open"); b.setAttribute("aria-expanded", n.classList.contains("open")); };
+const guard = (fn) => async (...a) => { try { await fn(...a); } catch(e) { console.error(e); toast("Une erreur est survenue. Vérifiez votre connexion et réessayez."); } };
+
+document.addEventListener("click", guard(async (e) => {
+  const g = e.target.closest("[data-go]");
+  if (g && !g.disabled) { e.preventDefault(); go(g.dataset.go); return; }
+  const b = e.target.closest("[data-act]");
+  if (b && !b.disabled && actions[b.dataset.act]) { e.preventDefault(); await actions[b.dataset.act](b, e); }
+}));
+document.addEventListener("submit", guard(async (e) => {
+  const f = e.target; if (!forms[f.id]) return;
+  e.preventDefault(); await forms[f.id](f, e);
+}));
+document.addEventListener("input", (e) => { for (const h of inputs) if (h(e.target)) return; });
+document.addEventListener("change", (e) => { for (const h of changes) if (h(e.target)) return; });
+
+/* ---------- Démarrage ---------- */
+store.onEvent((evt) => {
+  if (evt === "recovery") { go("nouveau-mot-de-passe"); return; }
+  K.resetCoachCache();
+  render(false);
+});
+$("#app").innerHTML = `<div class="boot"><p class="muted">Chargement…</p></div>`;
+store.boot().catch(err => { console.error(err); toast("Connexion au service impossible. Certains contenus peuvent manquer."); }).finally(() => render(true));
