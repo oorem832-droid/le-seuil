@@ -1,0 +1,151 @@
+# LE SEUIL
+
+*S’ouvrir pour mieux vivre.*
+
+LE SEUIL est une plateforme web responsive de bien-être psychologique, pensée d’abord pour le téléphone. Elle s’adresse au public francophone de Côte d’Ivoire et réunit :
+
+- un site public : accueil, Découvrir LE SEUIL, programmes, bibliothèque gratuite, FAQ, contact, aide, pages légales ;
+- des programmes interactifs de six semaines inspirés des TCC, à commencer par le Programme 01 « Apprendre à gérer mes inquiétudes » ;
+- un espace participant ;
+- l’Espace accompagnante de Judie Ore pour les forfaits 2 et 3 ;
+- une administration avec éditeur de programmes.
+
+Technique : **Vite** (JavaScript sans framework) · **Supabase** (Postgres, Auth, Storage, sécurité par lignes RLS) · **GitHub Pages** via GitHub Actions.
+
+> ⚠️ **Ceci est une maquette fonctionnelle, pas un service prêt à accueillir de vrais participants.**
+> Le contenu du Programme 01 vient du document Word fourni, une rédaction de travail. Il doit être relu sur le plan clinique et pédagogique avant toute mise en ligne.
+> Le paiement, l’accompagnement écrit, les appels et les questionnaires PHQ-9 / GAD-7 sont **désactivés** (table `feature_flags`). Ils le resteront tant que le cadre ivoirien, les procédures de confidentialité, d’orientation et de sécurité n’auront pas été validés.
+
+---
+
+## Terminologie
+
+| Interface | Usage |
+|---|---|
+| **Programme** | le parcours complet de six semaines |
+| **Semaine** | chaque étape hebdomadaire |
+| **Leçon** | les contenus pédagogiques |
+| **Exercice** | les activités interactives |
+| **Mon coach** | l’espace d’accompagnement des forfaits 2 et 3 |
+| **Espace accompagnante** | l’interface de Judie Ore |
+
+Dans le code et la base, une semaine s’appelle `programme_weeks` (le « module »). Une leçon, une vidéo, un exercice ou un bilan est une `programme_steps`.
+
+## Structure
+
+```
+index.html
+src/main.js                 Routeur, délégation d’événements, démarrage
+src/store.js                État + passerelle données
+src/data/supabase.js        Accès Supabase (sécurité appliquée côté base)
+src/data/local.js           Mode démonstration (données fictives dans le navigateur)
+src/content.js              Sujets, articles, forfaits, FAQ, présentation de l’accompagnante, outils de calme
+src/programme01.js          Programme 01, généré depuis le document Word
+src/ui/public.js            Pages publiques, connexion
+src/ui/member.js            Espace participant
+src/ui/exercises.js         Composants d’exercices réutilisables
+src/ui/coach.js             Espace accompagnante
+src/ui/admin.js             Administration et éditeur de programmes
+src/styles.css              Identité visuelle (clair et sombre)
+supabase/migrations/        Schéma, règles d’accès, stockage des médias
+supabase/seed.sql           Contenus de départ (généré)
+supabase/tests/rls_test.sql Tests des règles d’accès
+scripts/generate-seed.mjs   Génère seed.sql depuis src/
+scripts/source/             Document Word du Programme 01 + script d’import
+```
+
+## Lancer en local
+
+```bash
+npm install
+npm run dev
+```
+
+Sans fichier `.env.local`, le site tourne en **mode démonstration**. Cinq comptes de test sont proposés :
+- Awa (forfait 2) ;
+- Koffi (forfait 3) ;
+- Mariam (forfait 1) ;
+- Judie Ore (accompagnante) ;
+- Administration.
+
+Les données restent dans le navigateur.
+
+Avec Supabase : copier `.env.example` en `.env.local` et renseigner l’URL et la clé `anon` du projet.
+
+## Mettre en place Supabase
+
+1. Créer un projet sur supabase.com.
+2. Dans le **SQL Editor**, exécuter dans l’ordre :
+   - `supabase/migrations/20261019000000_init.sql`
+   - `supabase/migrations/20261019000100_storage.sql`
+   - `supabase/seed.sql`
+3. Dans **Authentication → URL Configuration**, déclarer l’adresse du site, par exemple `https://<compte>.github.io/le-seuil/`, comme *Site URL* et *Redirect URL*. Ajouter aussi `http://localhost:5173/`.
+4. Dans **Authentication → Emails**, traduire en français les e-mails de confirmation et de réinitialisation.
+5. Premier administrateur : créer un compte sur le site, puis exécuter :
+   ```sql
+   update public.profiles set role = 'admin' where id = (select id from auth.users where email = 'vous@exemple.com');
+   ```
+6. Judie Ore : elle crée son compte. Ensuite, dans **Administration → Équipe**, lui attribuer le rôle « Accompagnante » et compléter puis vérifier sa présentation « Mon coach ».
+
+## Déployer sur GitHub Pages
+
+1. Dans **Settings → Pages**, choisir *Source : GitHub Actions*.
+2. Dans **Settings → Secrets and variables → Actions**, ajouter `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`.
+3. Pousser sur `main` : le site se construit et se publie.
+
+La clé `anon` peut être publique : la protection repose sur les règles RLS. **Ne jamais** placer la clé `service_role` dans le site.
+
+## Qui voit quoi
+
+| Donnée | Participant | Accompagnante attribuée | Administration |
+|---|---|---|---|
+| Leçons, vidéos, exercices (contenus) | ✔ (connecté) | ✔ | ✔ |
+| Journal personnel, réponses aux exercices, autoévaluations | ✔ | ✘ jamais | ✘ jamais |
+| Bilans de semaine | ✔ | seulement ceux que le participant partage | ✘ |
+| Objectifs | ✔ | seulement si le participant les partage | ✘ |
+| Messages, rendez-vous | ✔ | ✔ (via fonctions tracées) | ✘ |
+| Notes professionnelles | ✘ | ses propres notes uniquement | ✘ |
+| Orientations | ✘ | ✔ | ✔ (nombre et statut) |
+| Questionnaires PHQ-9 / GAD-7 | ✔ si activés | ✔ si activés | ✘ |
+| Liste des inscriptions | — | ses participants | prénom, forfait, semaines terminées |
+| Journal de traçabilité | — | son propre historique par dossier | ✔ |
+
+Autres règles :
+- **Forfait 2** : accompagnement écrit hebdomadaire, questions sur le programme et informations pratiques.
+- **Forfait 3** : six échanges de 15 minutes. La messagerie y est uniquement pratique et administrative, imposé par la base (`message_kind_allowed`).
+- **Questionnaires** : ils exigent quatre activations, à savoir la fonctionnalité générale, le programme, le participant et un forfait 2 ou 3. Ils ne sont jamais proposés au forfait Autonome. Une réponse > 0 à l’item 9 du PHQ-9 est marquée « revue prioritaire » pour une revue humaine, sans aucune décision automatique. Le texte validé des questionnaires n’est pas inclus et doit être ajouté après validation.
+- **Questionnaire initial d’adéquation et de sécurité** : seule la date est conservée, jamais les réponses. Une réponse indiquant un danger affiche immédiatement l’orientation vers les urgences.
+- **Progression réelle** : ouvrir une page ne termine rien. Une leçon se termine par « J’ai terminé cette leçon ». Un exercice se termine seulement quand ses champs obligatoires sont remplis.
+- Le participant peut exporter ses données, effacer ses données de programme ou demander la suppression de son compte.
+
+Tests : `supabase/tests/rls_test.sql` contient 55 vérifications, toutes au vert sur une base de test.
+
+## Ajouter ou modifier un programme
+
+- **Sans code** : dans **Administration → Programmes**, vous pouvez :
+  - créer un programme ;
+  - modifier ses semaines ;
+  - ajouter des leçons, vidéos (téléversement, sous-titres .vtt, transcription), exercices et bilans ;
+  - réordonner les étapes ;
+  - prévisualiser, puis publier ou dépublier.
+- **Composants d’exercices disponibles** :
+  - formulaire, avec texte, échelle 0–10, choix, cases, liste répétable, objectif et partage ;
+  - fiche répétable ;
+  - quiz ;
+  - question de réflexion (enregistrée dans Mon journal) ;
+  - respiration guidée.
+- **Depuis un document Word** au format du Programme 01 : `bash scripts/source/import-programme-01.sh chemin/vers/document.docx`. Il faut pandoc et python3. La commande régénère `src/programme01.js` et `supabase/seed.sql`.
+
+## Avant la mise en ligne
+
+- [ ] Relecture clinique et pédagogique indépendante du Programme 01 (indications, contre-indications, sécurité, orientations)
+- [ ] Validation du questionnaire d’adéquation et de sécurité
+- [ ] Vérification juridique ivoirienne : protection des données, déclaration à l’ARTCI, conditions, confidentialité
+- [ ] Procédure d’orientation et protocole de sécurité avant d’activer l’accompagnement
+- [ ] Délais de réponse contractuels et présentation vérifiée de Judie Ore
+- [ ] Liste vérifiée des lignes d’écoute et services de santé mentale ivoiriens
+- [ ] Paiement mobile money via une Edge Function côté serveur, jamais depuis le navigateur
+- [ ] Rappels de rendez-vous (e-mail ou SMS) via une tâche planifiée côté serveur
+- [ ] Politique de conservation : tâche de suppression automatique, sauvegardes, procédure d’incident
+- [ ] Tournage des vidéos, sous-titres et transcriptions
+- [ ] Tests utilisateurs, accessibilité, nom de domaine et expéditeur d’e-mails
