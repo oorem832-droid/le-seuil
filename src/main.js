@@ -5,11 +5,16 @@ import * as P from "./ui/public.js";
 import * as M from "./ui/member.js";
 import * as K from "./ui/coach.js";
 import * as AD from "./ui/admin.js";
+import * as L from "./ui/library.js";
+import * as PG from "./ui/programmes.js";
 import * as store from "./store.js";
 import { S, C } from "./store.js";
 import { stopBreath } from "./ui/exercises.js";
 
-let current = location.hash.slice(1) || "accueil";
+// Retour d'un lien d'accès (invitation / réinitialisation) : Supabase lit les jetons dans l'URL.
+const AUTH_HASH = /access_token=|error_description=|type=(invite|recovery)/.test(location.hash);
+const AUTH_ERROR = /error_description=/.test(location.hash);
+let current = AUTH_HASH ? "premier-acces" : (location.hash.slice(1) || "accueil");
 
 function go(r){
   current = r;
@@ -18,7 +23,7 @@ function go(r){
   render(true);
 }
 window.addEventListener("popstate", () => { current = location.hash.slice(1) || "accueil"; render(true); });
-window.addEventListener("hashchange", () => { const h = location.hash.slice(1) || "accueil"; if (h !== current) { current = h; render(true); } });
+window.addEventListener("hashchange", () => { if (/access_token=|error_description=/.test(location.hash)) return; const h = location.hash.slice(1) || (current === "premier-acces" ? "premier-acces" : "accueil"); if (h !== current) { current = h; render(true); } });
 
 const MEMBER = { espace: M.mDash, demarrer: M.mOnboarding, lecons: M.mLessons, exercices: M.mExercises, journal: M.mJournal, objectifs: M.mGoals,
   evolution: M.mProgress, plan: M.mPlan, outils: M.mTools, coach: M.mCoach, compte: M.mAccount };
@@ -28,17 +33,17 @@ function page(r){
   let m;
   ui.params = [];
   if (r === "accueil") return P.pHome();
-  if (r === "decouvrir") return P.pDiscover();
-  if (r === "programmes") return P.pProgrammes();
-  if ((m = r.match(/^programme-(.+)$/))) return P.pProgramme(m[1]);
-  if (r === "bibliotheque") return P.pLibrary();
-  if ((m = r.match(/^sujet-(.+)$/))) return P.pTopic(m[1]);
-  if ((m = r.match(/^article-(.+)$/))) return P.pArticle(m[1]);
+  if (r === "apropos" || r === "decouvrir") return P.pAbout();
+  if (r === "programmes") return PG.pProgrammes();
+  if ((m = r.match(/^programme-(.+)$/))) return PG.pProgramme(m[1]);
+  if (r === "bibliotheque") return L.pLibrary();
+  if ((m = r.match(/^bibliotheque-(.+)$/))) return L.pLibrary(m[1]);
+  if ((m = r.match(/^article-(.+)$/))) return L.pArticle(m[1]);
   if (r === "faq") return P.pFAQ();
   if (r === "contact") return P.pContact();
   if (r === "aide" || r === "urgence") return P.pHelp();
   if (P.isLegal(r)) return P.pLegal(r);
-  if (r === "nouveau-mot-de-passe") return P.pNewPassword();
+  if (r === "premier-acces" || r === "nouveau-mot-de-passe") return P.pFirstAccess();
   if (r === "connexion") return S.user ? redirect(P.homeRoute()) : P.pLogin();
 
   // Espace accompagnante
@@ -68,9 +73,14 @@ function page(r){
 }
 function redirect(r){ current = r; try { history.replaceState(null, "", "#" + r); } catch(e) {} ui.route = r; return page(r); }
 
+const PRIVATE = /^(programme|programmes|connexion|premier-acces|espace|lecons|semaine|exercices|journal|objectifs|evolution|plan|outils|coach|compte|demarrer|admin|apercu|accompagnante)/;
 function render(navigated = false){
   stopBreath();
+  // Premier accès : le participant doit choisir son mot de passe avant toute autre page privée.
+  if (S.user && S.profile?.must_set_password && !/^(premier-acces|aide|confidentialite|conditions|limites|protection|accessibilite)$/.test(current)) current = "premier-acces";
   ui.route = current;
+  const robots = document.querySelector('meta[name="robots"]');
+  if (robots) robots.content = PRIVATE.test(current) ? "noindex, nofollow" : "index, follow";
   const html = page(current);
   $("#app").innerHTML = P.header() + `<main id="main" tabindex="-1">${html}</main>` + P.footer();
   if (navigated) {
@@ -111,4 +121,7 @@ store.onEvent((evt) => {
   render(false);
 });
 $("#app").innerHTML = `<div class="boot"><p class="muted">Chargement…</p></div>`;
-store.boot().catch(err => { console.error(err); toast("Connexion au service impossible. Certains contenus peuvent manquer."); }).finally(() => render(true));
+store.boot().catch(err => { console.error(err); toast("Connexion au service impossible. Certains contenus peuvent manquer."); }).finally(() => {
+  if (AUTH_HASH) { try { history.replaceState(null, "", location.pathname + "#premier-acces"); } catch (e) {} if (AUTH_ERROR && !S.user) toast("Ce lien a expiré ou a déjà été utilisé."); }
+  render(true);
+});

@@ -1,0 +1,4 @@
+create or replace function public.t_ok(label text, cond boolean) returns void language plpgsql as $$ begin raise notice '% %', case when cond then 'PASS' else 'FAIL' end, label; end $$;
+create or replace function public.t_err(label text, stmt text) returns void language plpgsql as $$ begin execute stmt; raise notice 'FAIL % (no error)', label; exception when others then raise notice 'PASS % (%)', label, left(sqlerrm, 70); end $$;
+create or replace function public.t_rows(label text, stmt text, expected int) returns void language plpgsql as $$ declare n int; begin execute 'select count(*) from (' || stmt || ') x' into n; raise notice '% % (got %, want %)', case when n = expected then 'PASS' else 'FAIL' end, label, n, expected; end $$;
+grant execute on function t_ok(text,boolean), t_err(text,text), t_rows(text,text,int) to authenticated, anon;

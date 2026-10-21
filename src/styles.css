@@ -397,3 +397,29 @@ fieldset.field{border:0;padding:0;margin:0}
   #print-root h1{font-size:20pt;margin-bottom:12pt} #print-root .pre{font-family:Georgia,serif;font-size:11pt;line-height:1.5}
   .print-foot{margin-top:24pt;font-size:9pt;color:#555}
 }
+
+/* ---------- v3 : Bibliothèque, programmes, administration ---------- */
+main h1[tabindex="-1"]:focus,main h2[tabindex="-1"]:focus{outline:none}
+.crumbs{list-style:none;display:flex;flex-wrap:wrap;gap:4px 0;padding:0;margin:0 0 14px;font-size:.86rem;color:var(--muted)}
+.crumbs li{display:inline-flex;align-items:center;min-width:0}
+.crumbs li+li::before{content:"/";margin:0 8px;opacity:.6}
+.crumbs li[aria-current]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:28ch}
+.chip-n{display:inline-block;margin-left:6px;font-size:.78em;opacity:.65}
+.lib-card .lib-card-foot{margin-top:auto;justify-content:space-between;align-items:center;gap:10px}
+.art-title{max-width:22ch}
+.art-img{width:100%;border-radius:var(--r-lg,18px);display:block}
+.retenir{background:var(--sage-soft);border-left:4px solid var(--sage);padding:14px 16px;border-radius:var(--r-md,12px);font-weight:500}
+.mention{border-top:1px solid var(--line,rgba(0,0,0,.08));padding-top:14px}
+.refs summary{cursor:pointer;font-weight:600}
+.refs ul{margin:10px 0;padding-left:20px;font-size:.88rem;color:var(--muted)}
+.refs li{margin:4px 0;overflow-wrap:anywhere}
+.row.share{flex-wrap:wrap;gap:8px;align-items:center}
+.join-steps{margin:0;padding-left:22px;display:grid;gap:10px}
+.plan-pick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pick{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line,rgba(0,0,0,.12));border-radius:var(--r-md,12px);padding:12px;cursor:pointer;background:var(--paper,#fffdf8)}
+.pick>span{display:flex;flex-direction:column;gap:2px}
+.pick:has(input:checked){border-color:var(--forest);background:var(--sage-soft)}
+.pick input{margin-top:3px;accent-color:var(--forest)}
+.prog-switch{flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.part-detail{border:1.5px solid var(--sage)}
+@media (max-width:640px){.plan-pick{grid-template-columns:1fr}.crumbs li[aria-current]{max-width:18ch}}

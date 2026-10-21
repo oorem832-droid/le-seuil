@@ -44,7 +44,15 @@ actions["logout"] = async () => { await store.signOut(); toast("Vous êtes déco
 
 /* ---------- Tableau de bord ---------- */
 export function mDash(){
-  if (!S.enrolment) return memberShell(H("Mon espace", `Bonjour, ${esc(S.user.name)}`) + `<p class="muted">Aucun programme n’est associé à ce compte.</p>`);
+  if (!S.enrolment || !store.enrolmentValid()) {
+    const e = S.enrolment;
+    const why = !e ? "Aucun programme n’est encore associé à votre compte."
+      : S.profile?.account_status === "suspended" || e.suspended ? "Votre accès est suspendu pour le moment."
+      : e.admission_status !== "admis" ? "Votre demande est en cours de vérification par l’équipe LE SEUIL."
+      : e.access_expires_at && new Date(e.access_expires_at) <= new Date() ? `Votre accès au programme s’est terminé le ${fmtDate(e.access_expires_at)}.`
+      : e.access_starts_at && new Date(e.access_starts_at) > new Date() ? `Votre accès ouvrira le ${fmtDate(e.access_starts_at)}.` : "Votre accès n’est pas encore actif.";
+    return memberShell(H("Mon espace", `Bonjour, ${esc(S.user.name)}`) + `${switcher()}<div class="card stack"><p>${why}</p><p class="small muted">Pour toute question sur votre accès, écrivez-nous depuis la page <a href="#contact" data-go="contact">Contact</a>. Les articles de la <a href="#bibliotheque" data-go="bibliotheque">Bibliothèque</a> restent en accès libre.</p></div>`);
+  }
   const n = currentWeek(), w = C.weeks[n-1], p = pctDone();
   const ls = lessonsAll(), lsDone = ls.filter(s => S.progress[s.uuid] === "completed").length;
   const g = mainGoal(), wg = S.goals.filter(x => x.scope === "hebdomadaire" && x.status === "actif").slice(-1)[0];
@@ -52,6 +60,7 @@ export function mDash(){
   const start = !onboarded();
   return memberShell(`
    ${H("Tableau de bord", `Bonjour, ${esc(S.user.name)}`, "Avancez à votre rythme. Chaque petit pas compte.")}
+   ${switcher()}
    <div class="card dash-main">
     <div class="ring" style="--p:${p}" role="img" aria-label="Progression : ${p} %"><span>${p}%</span></div>
     <div class="stack" style="gap:8px;flex:1;min-width:220px">
@@ -75,6 +84,14 @@ export function mDash(){
    <p class="small muted">${icon("phone")} LE SEUIL n’est pas un service d’urgence. En cas de danger, appelez le SAMU au 185.</p>`);
 }
 actions["continue"] = () => go(onboarded() ? resumeTarget() : "demarrer");
+
+/* Plusieurs programmes sur le même compte : choix du programme affiché. */
+function switcher(){
+  if ((S.enrolments || []).length < 2) return "";
+  return `<div class="row prog-switch"><label class="small" for="prog-switch">Programme :</label><select id="prog-switch" class="sel-inline">${S.enrolments.map(e => {
+    const p = C.programmes.find(x => x.uuid === e.programme_id); return `<option value="${e.id}" ${e.id === S.enrolment?.id ? "selected" : ""}>${esc(p?.title || "Programme")}${store.validEnrolment(e) ? "" : " (inactif)"}</option>`; }).join("")}</select></div>`;
+}
+changes.push(t => { if (t.id !== "prog-switch") return false; store.switchEnrolment(t.value).then(() => go("espace")); return true; });
 
 /* ---------- Démarrage : adéquation, consentement, point de départ ---------- */
 export function mOnboarding(){
@@ -140,6 +157,7 @@ forms["onb-start"] = async () => {
 
 /* ---------- Mes leçons ---------- */
 export function mLessons(){
+  if (!store.enrolmentValid()) return mDash();
   return memberShell(`${H("Mes leçons", esc(C.programme.title), `${pctDone()} % du programme terminé`)}
    <div class="progress" aria-hidden="true"><i style="width:${pctDone()}%"></i></div>
    ${DEMO ? `<label class="check small"><input type="checkbox" id="unlockall" ${S.enrolment?.unlock_all?"checked":""}><span>Maquette : débloquer toutes les semaines</span></label>` : ""}
@@ -163,6 +181,7 @@ changes.push(t => { if (t.id !== "unlockall") return false; store.patchEnrolment
 
 /* ---------- Lecteur de semaine ---------- */
 export function mPlayer(n, i, preview = false){
+  if (!preview && !store.enrolmentValid()) return mDash();
   const w = C.weeks[n-1];
   if (!w) return memberShell(`<p class="muted">Semaine introuvable.</p>`);
   if (!preview && !onboarded()) return mOnboarding();

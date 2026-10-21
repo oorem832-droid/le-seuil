@@ -1,6 +1,8 @@
 // État de l'application et passerelle vers les données (Supabase ou démonstration locale).
 import { createSupabaseBackend } from './data/supabase.js';
 import { createLocalBackend } from './data/local.js';
+import { validEnrolment } from './data/supabase.js';
+export { validEnrolment };
 
 const URL_ = import.meta.env.VITE_SUPABASE_URL;
 const KEY_ = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -10,7 +12,7 @@ export const PROGRAMME_SLUG = 'inquietudes';
 
 export const C = { articles: [], programmes: [], programme: null, weeks: [], videos: [], plans: [], flags: {} };
 
-const fresh = () => ({ user: null, profile: null, enrolment: null, progress: {}, completions: {}, responses: {}, journal: [], goals: [], ratings: [],
+const fresh = () => ({ user: null, profile: null, enrolments: [], enrolment: null, progress: {}, completions: {}, responses: {}, journal: [], goals: [], ratings: [],
   summaries: {}, saved: { article: new Set(), worksheet: new Set() }, messages: [], appointments: [], suggestions: [], coach: null, questionnaires: [], coachProfile: null });
 export let S = fresh();
 
@@ -24,16 +26,18 @@ export async function loadContent() {
   const c = await api.content(staff);
   Object.assign(C, c);
   C.programme = C.programmes.find(p => p.slug === PROGRAMME_SLUG) || C.programmes[0] || null;
-  C.weeks = C.programme ? await api.weeks(C.programme.uuid) : [];
+  C.weeks = [];
 }
+let preferredEnrolment = null;
+try { preferredEnrolment = localStorage.getItem('leseuil-programme'); } catch (e) {}
 
 export async function loadUser() {
   const u = await api.user();
   S = fresh();
   if (!u) return;
-  const programmeId = C.programme?.uuid;
-  const d = await api.participant(programmeId);
+  const d = await api.participant(preferredEnrolment);
   const p = d.profile;
+  S.enrolments = d.enrolments || [];
   S.user = { id: u.id, email: u.email || p.email, name: p.first_name || (u.email || '').split('@')[0], role: p.role };
   S.profile = p; S.enrolment = d.enrolment; S.coach = d.coach; S.questionnaires = d.questionnaires || [];
   d.progress.forEach(r => { S.progress[r.step_id] = r.status; });
@@ -44,7 +48,17 @@ export async function loadUser() {
   d.saved.forEach(r => S.saved[r.kind]?.add(r.ref));
   if (S.user.role === 'coach') S.coachProfile = await api.coachProfile();
   if (isStaff() || isCoach()) { await loadContent(); }
+  // Programme de l'inscription choisie : ses semaines ne sont chargées que si l'accès est autorisé (vérifié côté serveur).
+  if (S.enrolment) {
+    C.programme = C.programmes.find(x => x.uuid === S.enrolment.programme_id) || C.programme;
+    C.weeks = validEnrolment(S.enrolment) ? await api.weeks(S.enrolment.programme_id) : [];
+  } else if (isStaff() && C.programme) C.weeks = await api.weeks(C.programme.uuid);
 }
+export async function switchEnrolment(id) {
+  preferredEnrolment = id; try { localStorage.setItem('leseuil-programme', id); } catch (e) {}
+  await loadContent(); await loadUser();
+}
+export const enrolmentValid = () => validEnrolment(S.enrolment) && S.profile?.account_status !== 'suspended';
 
 let listener = () => {};
 export function onEvent(fn) { listener = fn; }

@@ -1,12 +1,14 @@
 // Pages publiques : accueil, découverte, programmes, bibliothèque gratuite, FAQ, contact, aide, pages légales, connexion.
-import { TOPICS, EMERGENCY, FAQ, COACH, CATALOGUE_SIZE } from "../content.js";
+import { EMERGENCY, FAQ, COACH } from "../content.js";
+import { featuredArticles, articleCard } from "./library.js";
+import { programmeCard } from "./programmes.js";
 import { esc, icon, cover, HERO_ART, LOGO, MARK, pageHead, fmtDate, fcfa, toast, $ } from "./util.js";
 import { ui, actions, forms, inputs, rerender, go } from "./state.js";
 import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
 
-export const NAV = [["accueil","Accueil"],["decouvrir","Découvrir LE SEUIL"],["programmes","Nos programmes"],["bibliotheque","Bibliothèque gratuite"],["faq","Questions fréquentes"],["contact","Contact"]];
-const navActive = (r) => r.startsWith("sujet-") || r.startsWith("article-") ? "bibliotheque" : r.startsWith("programme-") ? "programmes" : r;
+export const NAV = [["accueil","Accueil"],["apropos","À propos"],["bibliotheque","Bibliothèque"],["programmes","Nos programmes"],["contact","Contact"]];
+const navActive = (r) => r.startsWith("article-") || r.startsWith("bibliotheque") ? "bibliotheque" : r.startsWith("programme-") ? "programmes" : r === "decouvrir" ? "apropos" : r;
 export const homeRoute = () => !S.user ? "connexion" : store.isCoach() ? "accompagnante" : store.isStaff() ? "admin" : "espace";
 
 export function header(){
@@ -18,7 +20,6 @@ export function header(){
    <button class="brand" data-go="accueil" aria-label="LE SEUIL, accueil"><img src="${MARK}" alt=""><span>LE SEUIL</span></button>
    <nav class="main" id="mainnav" aria-label="Navigation principale">${NAV.map(([k,l])=>`<button data-go="${k}" ${a===k?'aria-current="page"':""}>${l}</button>`).join("")}</nav>
    <div class="head-cta">
-    <button class="btn btn-ghost btn-sm" data-go="programmes">Découvrir les programmes</button>
     <button class="btn btn-primary btn-sm" data-go="${homeRoute()}">${icon("user")}${who}</button>
    </div>
    <button class="btn btn-soft btn-sm burger" data-act="burger" aria-controls="mainnav" aria-expanded="false" aria-label="Menu">${icon("menu")}</button>
@@ -33,7 +34,7 @@ export function footer(){
      <p class="small" style="opacity:.85">Psychoéducation et programmes d’auto-assistance inspirés des TCC. Abidjan, Côte d’Ivoire.</p></div>
     <div><h4>Explorer</h4><div class="stack" style="gap:2px">${NAV.slice(1).map(([k,l])=>`<button class="f" data-go="${k}">${l}</button>`).join("")}</div></div>
     <div><h4>Informations</h4><div class="stack" style="gap:2px">
-     <button class="f" data-go="limites">Ce que LE SEUIL propose et ne propose pas</button><button class="f" data-go="aide">Trouver une aide appropriée</button>
+     <button class="f" data-go="faq">Questions fréquentes</button><button class="f" data-go="limites">Ce que LE SEUIL propose et ne propose pas</button><button class="f" data-go="aide">Trouver une aide appropriée</button>
      <button class="f" data-go="confidentialite">Confidentialité</button><button class="f" data-go="conditions">Conditions d’utilisation</button>
      <button class="f" data-go="accessibilite">Accessibilité</button><button class="f" data-go="protection">Protection et orientation</button></div></div>
     <div><h4>Contact</h4><div class="stack small" style="gap:6px;opacity:.9">
@@ -45,51 +46,8 @@ export function footer(){
   </div></footer>`;
 }
 
-/* ---------- Blocs ---------- */
-const published = () => C.articles.filter(a => a.status === "published");
-export const artCard = (a,i) => `<button class="card art-card" data-go="article-${a.id}"><div class="cover">${cover(a.hue,i+1)}</div><div class="body"><div class="row" style="gap:8px"><span class="tag">${esc(a.cat)}</span><span class="small muted">${a.read} min de lecture</span></div><h3>${esc(a.title)}</h3><p class="muted small">${esc(a.excerpt)}</p></div></button>`;
-const minPrice = () => Math.min(...C.plans.map(p => p.price));
-
-function progCard(p, i){
-  return `<article class="card prog-card"><div class="cover">${cover(p.hue||"sage",i+4)}</div><div class="body">
-   <div class="meta"><span class="tag">Programme ${esc(p.code||"")}</span><span class="tag">6 semaines</span>${p.status==="published"?"":`<span class="tag gold">Maquette</span>`}</div>
-   <h3>${esc(p.title)}</h3><p class="muted">${esc(p.summary)}</p>
-   <p class="small muted">À partir de <b class="num" style="color:var(--forest)">${fcfa(minPrice())}</b> · paiement unique</p>
-   <div class="row" style="margin-top:auto"><button class="btn btn-primary btn-sm" data-go="programme-${p.slug}">Voir le programme ${icon("arrow")}</button></div>
-  </div></article>`;
-}
-const soonCard = () => `<article class="card-flat stack soon-card"><span class="tag warn">En préparation</span><h3>${CATALOGUE_SIZE - C.programmes.length} autres programmes</h3><p class="muted">Le catalogue LE SEUIL accueillera progressivement onze programmes, chacun construit sur le même modèle de six semaines.</p></article>`;
-
-export function pricing(){
-  const yes = '<span class="yes">Inclus</span>', no = '<span class="no">—</span>';
-  const plans = C.plans;
-  return `<div class="stack-lg">
-   <div class="grid g3">${plans.map(p=>`<article class="card plan-card ${p.featured?"featured":""}">
-     <div class="stack" style="gap:4px"><span class="eyebrow">Forfait ${plans.indexOf(p)+1}</span><h3 style="margin:0">${esc(p.short)}</h3></div>
-     <div class="price">${fcfa(p.price).replace(" FCFA","")} <small>FCFA · paiement unique</small></div>
-     <ul class="ticks">${p.lines.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>
-     <button class="btn ${p.featured?"btn-primary":"btn-ghost"}" ${C.flags.payments?"":"disabled"} title="Les inscriptions payantes ne sont pas encore ouvertes">${C.flags.payments?"Choisir ce forfait":"Inscriptions bientôt ouvertes"}</button>
-   </article>`).join("")}</div>
-   <div class="table-wrap"><table><caption class="sr">Comparaison des trois forfaits</caption>
-    <thead><tr><th scope="col">Ce qui est inclus</th>${plans.map(p=>`<th class="c" scope="col">${esc(p.short)}</th>`).join("")}</tr></thead>
-    <tbody>
-     <tr><th scope="row">Les six semaines : leçons et vidéos</th><td class="c">${yes}</td><td class="c">${yes}</td><td class="c">${yes}</td></tr>
-     <tr><th scope="row">Exercices interactifs</th><td class="c">${yes}</td><td class="c">${yes}</td><td class="c">${yes}</td></tr>
-     <tr><th scope="row">Journal personnel et objectifs</th><td class="c">${yes}</td><td class="c">${yes}</td><td class="c">${yes}</td></tr>
-     <tr><th scope="row">Suivi personnel non clinique et plan final</th><td class="c">${yes}</td><td class="c">${yes}</td><td class="c">${yes}</td></tr>
-     <tr><th scope="row">Accompagnement écrit chaque semaine*</th><td class="c">${no}</td><td class="c">${yes}</td><td class="c">${no}</td></tr>
-     <tr><th scope="row">Messagerie privée sécurisée</th><td class="c">${no}</td><td class="c">${yes}</td><td class="c small">Pratique uniquement</td></tr>
-     <tr><th scope="row">Six échanges de 15 minutes, téléphone ou vidéo*</th><td class="c">${no}</td><td class="c">${no}</td><td class="c">${yes}</td></tr>
-     <tr><th scope="row">Prix (paiement unique)</th>${plans.map(p=>`<td class="c num"><b>${fcfa(p.price)}</b></td>`).join("")}</tr>
-    </tbody></table></div>
-   <p class="small muted">Chaque forfait correspond à un programme complet de six semaines, sans abonnement automatique. * Selon les conditions du service. Les échanges ne sont ni des consultations psychologiques ni des séances de psychothérapie.</p>
-   ${C.flags.payments?"":`<div class="notice">${icon("info")}<span>Les inscriptions payantes et l’accompagnement ouvriront une fois le cadre réglementaire ivoirien vérifié et les procédures de confidentialité, d’orientation et de sécurité validées.</span></div>`}
-  </div>`;
-}
-
-/* ---------- Accueil ---------- */
 export function pHome(){
-  const arts = published().slice(0,3);
+  const arts = featuredArticles();
   return `
   <section class="hero"><div class="wrap">
    <div class="stack-lg fade-in">
@@ -106,7 +64,7 @@ export function pHome(){
    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:48px;align-items:start">
     <div class="stack"><span class="eyebrow">Qu’est-ce que LE SEUIL ?</span><h2>Un passage entre le silence et la parole.</h2>
      <p class="lede">LE SEUIL propose des ressources de psychoéducation et des programmes interactifs d’auto-assistance inspirés des thérapies cognitives et comportementales (TCC). Nous orientons vers des professionnels qualifiés lorsque c’est nécessaire.</p>
-     <button class="linkbtn" data-go="decouvrir" style="align-self:flex-start">Découvrir notre mission et notre approche</button></div>
+     <button class="linkbtn" data-go="apropos" style="align-self:flex-start">Découvrir notre mission et notre approche</button></div>
     <div class="grid" style="gap:14px">
      ${[["Soutien","Ne plus traverser seul les moments difficiles, avec des outils et des repères fiables."],["Compréhension","Mettre des mots simples sur ce que l’on vit, sans jugement et sans jargon."],["Équilibre","Avancer à son rythme vers un quotidien plus serein, pas à pas."]].map(([t,d])=>`<div class="card-flat"><h3>${t}</h3><p class="muted">${d}</p></div>`).join("")}
     </div>
@@ -121,13 +79,13 @@ export function pHome(){
   </div></section>
 
   <section class="section"><div class="wrap">
-   <div class="section-head"><div class="stack" style="gap:8px"><span class="eyebrow">Programmes de six semaines</span><h2>Nos programmes</h2></div><button class="btn btn-soft" data-go="programmes">Forfaits et tarifs ${icon("arrow")}</button></div>
-   <div class="grid g3">${C.programmes.filter(p=>p.status!=="draft").map(progCard).join("")}${soonCard()}</div>
+   <div class="section-head"><div class="stack" style="gap:8px"><span class="eyebrow">Programmes de six semaines</span><h2>Nos programmes</h2></div><button class="btn btn-soft" data-go="programmes">Voir tous les programmes ${icon("arrow")}</button></div>
+   <div class="grid g3">${C.programmes.filter(p=>["demo","published"].includes(p.status)).slice(0,3).map(programmeCard).join("")}</div>
   </div></section>
 
   <section class="section" style="padding-top:0"><div class="wrap">
-   <div class="section-head"><div class="stack" style="gap:8px"><span class="eyebrow">Le Journal du Seuil</span><h2>Derniers articles</h2></div><button class="btn btn-soft" data-go="bibliotheque">Toute la bibliothèque ${icon("arrow")}</button></div>
-   <div class="grid g3">${arts.map(artCard).join("")}</div>
+   <div class="section-head"><div class="stack" style="gap:8px"><span class="eyebrow">La Bibliothèque · en accès libre</span><h2>À lire dans notre Bibliothèque</h2></div><button class="btn btn-soft" data-go="bibliotheque">Explorer la Bibliothèque ${icon("arrow")}</button></div>
+   ${arts.length ? `<div class="grid g3">${arts.map(articleCard).join("")}</div>` : `<p class="muted">Les articles sont en cours de relecture et seront publiés prochainement.</p>`}
   </div></section>
 
   <section class="section band"><div class="wrap founder">
@@ -145,9 +103,9 @@ const limitsCards = () => `<div class="grid g2">
     <div class="card stack"><h3>Ce que LE SEUIL ne propose pas</h3><ul class="ticks no-ticks"><li>De diagnostic, ni de score de risque automatique</li><li>De psychothérapie, de consultation psychologique ou de prise en charge psychiatrique</li><li>De suivi clinique continu ou de surveillance permanente des réponses</li><li>De réponse aux urgences : en cas de danger, appelez le 185</li></ul></div>
    </div>`;
 
-/* ---------- Découvrir ---------- */
-export function pDiscover(){
-  return pageHead("Découvrir LE SEUIL","Le nom évoque un passage","Celui entre le silence et la parole, entre l’hésitation et le premier pas, entre le sentiment d’être seul et la possibilité de recevoir du soutien.") + `
+/* ---------- À propos ---------- */
+export function pAbout(){
+  return pageHead("À propos","Le nom évoque un passage","Celui entre le silence et la parole, entre l’hésitation et le premier pas, entre le sentiment d’être seul et la possibilité de recevoir du soutien.") + `
   <section class="section"><div class="wrap two-col">
    <div class="prose">
     <h2>Notre mission</h2>
@@ -157,7 +115,7 @@ export function pDiscover(){
     <p>Chaque programme dure six semaines. Les leçons sont standardisées : tous les participants d’un même programme reçoivent les mêmes contenus. Vos réponses, votre journal et vos objectifs, eux, n’appartiennent qu’à vous.</p>
     <p>LE SEUIL ne se présente pas comme un service de diagnostic, de psychothérapie ou de prise en charge psychiatrique.</p>
     <h2>L’accompagnement</h2>
-    <p>Avec les forfaits 2 et 3, ${esc(COACH.name)}, ${esc(COACH.title.toLowerCase())}, vous aide à suivre le programme : par écrit chaque semaine, ou par six échanges de 15 minutes. Cet accompagnement n’est ni une consultation psychologique ni une séance de psychothérapie.</p>
+    <p>Avec les formules 2 et 3, ${esc(COACH.name)}, accompagnante en bien-être psychologique et ancienne Psychological Wellbeing Practitioner (Royaume-Uni), vous aide à suivre le programme : par écrit chaque semaine, ou par six échanges de 15 minutes. Cet accompagnement n’est ni une consultation psychologique ni une séance de psychothérapie.</p>
     <h2>À qui nous nous adressons</h2>
     <p>Aux adultes : parents, étudiants, enseignants, salariés. Des ressources pour les adolescents et les établissements scolaires pourront être développées plus tard, avec des dispositions spécifiques sur le consentement, la confidentialité et la protection des mineurs.</p>
     <h2>Une inspiration</h2>
@@ -167,111 +125,6 @@ export function pDiscover(){
     <div class="card-flat stack" style="gap:10px"><h4>En une phrase</h4><p class="muted">LE SEUIL est née de la conviction qu’oser demander de l’aide peut être le premier pas vers une vie plus sereine.</p></div></aside>
   </div></section>`;
 }
-
-/* ---------- Programmes ---------- */
-export function pProgrammes(){
-  return pageHead("Nos programmes","Des programmes de six semaines, à votre rythme","Chaque programme suit la même progression : des leçons courtes, des vidéos, des exercices interactifs et un bilan chaque semaine.") + `
-  <section class="section" style="padding-top:40px"><div class="wrap"><div class="grid g3">${C.programmes.filter(p=>p.status!=="draft").map(progCard).join("")}${soonCard()}</div></div></section>
-  <section class="section band"><div class="wrap">
-   <div class="section-head"><div class="stack" style="gap:8px"><span class="eyebrow">Forfaits et tarifs de lancement</span><h2>Trois façons de suivre un programme</h2></div></div>
-   ${pricing()}
-  </div></section>`;
-}
-export function pProgramme(slug){
-  const p = C.programmes.find(x => x.slug === slug) || C.programme; if (!p) return pProgrammes();
-  const intro = Array.isArray(p.intro) ? p.intro : String(p.intro||"").split(/\n\n/);
-  return pageHead(`Programme ${esc(p.code||"")} · 6 semaines`, esc(p.title), esc(p.summary), `<button class="linkbtn" data-go="programmes">Nos programmes</button> / ${esc(p.title)}`) + `
-  <section class="section"><div class="wrap two-col">
-   <div class="stack-lg">
-    <div class="prose">${intro.filter(Boolean).map(x=>`<p>${esc(x)}</p>`).join("")}</div>
-    ${p.objectives?.length?`<div class="card-flat stack"><h3>Ce que vous allez apprendre</h3><ul class="ticks">${p.objectives.map(o=>`<li>${esc(o)}</li>`).join("")}</ul></div>`:""}
-    <h2>Le programme, semaine après semaine</h2>
-    <ol class="timeline">${C.weeks.map(w=>`<li><span class="dot">${w.n}</span><div class="tl-body"><span class="eyebrow">Semaine ${w.n}</span><h4>${esc(w.title)}</h4>${w.intro?`<p class="small muted">${esc(String(w.intro).split("\n\n")[0])}</p>`:""}</div></li>`).join("")}</ol>
-   </div>
-   <aside class="aside"><div class="card stack"><h3>Chaque semaine</h3><ul class="ticks small"><li>Un message d’accueil et des leçons courtes</li><li>Des exemples fictifs ancrés dans le quotidien</li><li>De courtes vidéos, sous-titrées et transcrites</li><li>Un exercice principal et des exercices facultatifs</li><li>Un journal personnel et un bilan</li><li>Des outils pour retrouver votre calme</li></ul>
-    <button class="btn btn-primary" data-act="start-programme">${S.user?"Accéder à mon programme":"Créer un compte gratuit"} ${icon("arrow")}</button>
-    <p class="small muted">${DEMO?"Maquette : accès avec des comptes de test.":"Accès de démonstration gratuit, sans paiement."}</p></div></aside>
-  </div></section>
-  <section class="section band"><div class="wrap"><div class="section-head"><h2>Forfaits</h2></div>${pricing()}</div></section>`;
-}
-actions["start-programme"] = () => { if (S.user) go(homeRoute()); else { ui.loginMode = DEMO ? "login" : "signup"; go("connexion"); } };
-
-/* ---------- Bibliothèque gratuite ---------- */
-export function pLibrary(){
-  const tabs = [["sujets","Comprendre"],["articles","Le Journal du Seuil"],["videos","Vidéos et entretiens"]];
-  let body = "";
-  if (ui.libTab === "sujets") {
-    const q = ui.libQuery.trim().toLowerCase();
-    const list = TOPICS.filter(t => !q || (t.title+" "+t.intro).toLowerCase().includes(q));
-    body = `<label class="search">${icon("search")}<span class="sr">Rechercher un sujet</span><input id="libsearch" type="text" placeholder="Rechercher : sommeil, anxiété, parentalité…" value="${esc(ui.libQuery)}"></label>
-     <div class="grid g3">${list.map(t=>`<button class="topic-btn" data-go="sujet-${t.slug}"><strong>${t.title}</strong><span class="small muted">${esc(t.intro.split(". ")[0])}.</span></button>`).join("") || `<p class="muted">Aucun sujet ne correspond à « ${esc(ui.libQuery)} ».</p>`}</div>`;
-  } else if (ui.libTab === "articles") {
-    const cats = ["Tous","Comprendre ses émotions","Le quotidien et le bien-être","Parentalité","Vie professionnelle","Déconstruire les idées reçues","Paroles de professionnels"];
-    const q = ui.query.trim().toLowerCase();
-    const list = published().filter(a => (ui.filterCat==="Tous"||a.cat===ui.filterCat) && (!q || (a.title+" "+a.excerpt+" "+a.body.join(" ")).toLowerCase().includes(q)));
-    body = `<label class="search">${icon("search")}<span class="sr">Rechercher un article</span><input id="jsearch" type="text" placeholder="Rechercher un article" value="${esc(ui.query)}"></label>
-     <div class="chips" role="group" aria-label="Filtrer par rubrique">${cats.map(c=>`<button class="chip" data-act="cat" data-v="${c}" aria-pressed="${c===ui.filterCat}">${c}</button>`).join("")}</div>
-     <div class="grid g3">${list.map(artCard).join("") || `<p class="muted">Aucun article ne correspond à votre recherche.</p>`}</div>`;
-  } else {
-    body = `<div class="grid g2">${C.videos.map(v=>`<article class="card stack" style="gap:12px">
-     <div class="video"><div><div class="play">${icon("play")}</div><span class="small">${v.url?"":"Vidéo en préparation · "}${esc(v.len)}</span></div></div>
-     <h3>${esc(v.title)}</h3><p class="small" style="color:var(--gold);font-weight:600">${esc(v.who)}</p><p class="muted">${esc(v.desc)}</p>
-     <p class="small muted">Sous-titres en français et transcription prévus.</p></article>`).join("")}</div>`;
-  }
-  return pageHead("Bibliothèque gratuite","Comprendre, lire, regarder","Des ressources gratuites pour mieux comprendre le bien-être psychologique. Elles ne remplacent pas l’avis d’un professionnel.") + `
-  <section class="section" style="padding-top:28px"><div class="wrap stack-lg">
-   <div class="tabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" data-act="libtab" data-v="${k}" aria-selected="${ui.libTab===k}">${l}</button>`).join("")}</div>
-   ${body}
-   <div class="notice calm">${icon("info")}<span>Ces contenus sont informatifs. Aucun questionnaire présent sur LE SEUIL n’a valeur de diagnostic.</span></div>
-  </div></section>`;
-}
-actions["libtab"] = (b) => { ui.libTab = b.dataset.v; rerender(); };
-actions["cat"] = (b) => { ui.filterCat = b.dataset.v; rerender(); };
-inputs.push(t => { if (t.id==="libsearch"){ ui.libQuery=t.value; rerender(); return true; } if (t.id==="jsearch"){ ui.query=t.value; rerender(); return true; } return false; });
-
-export function pTopic(slug){
-  const t = TOPICS.find(x=>x.slug===slug); if(!t) return pLibrary();
-  const rel = published().filter(a=>a.topic===slug);
-  const isWorry = slug === "stress-anxiete";
-  return pageHead("Bibliothèque gratuite · Comprendre", t.title, t.intro, `<button class="linkbtn" data-go="bibliotheque">Bibliothèque</button> / ${t.title}`) + `
-  <section class="section"><div class="wrap two-col">
-   <div class="prose">
-    <h2>Ce que l’on peut vivre</h2><ul>${t.vecu.map(x=>`<li>${x}</li>`).join("")}</ul>
-    <h2>Ce qui peut aider au quotidien</h2><ul>${t.pistes.map(x=>`<li>${x}</li>`).join("")}</ul>
-    <h2>Quand consulter un professionnel</h2><p>${t.consulter}</p>
-    <div class="notice">${icon("phone")}<span>Si vous pensez à vous faire du mal ou êtes en danger, appelez le SAMU au 185 ou rendez-vous aux urgences.</span></div>
-   </div>
-   <aside class="aside">
-    ${isWorry && C.programme?`<div class="card stack" style="gap:10px"><span class="tag gold">Programme ${esc(C.programme.code)}</span><h4>${esc(C.programme.title)}</h4><p class="small muted">${esc(C.programme.summary)}</p><button class="btn btn-primary btn-sm" data-go="programme-${C.programme.slug}">Découvrir</button></div>`:""}
-    <div class="card-flat stack" style="gap:10px"><h4>À lire aussi</h4>${(rel.length?rel:published().slice(0,2)).map(a=>`<button class="linkbtn" style="text-align:left" data-go="article-${a.id}">${esc(a.title)}</button>`).join("")}</div>
-   </aside>
-  </div></section>`;
-}
-
-export function pArticle(id){
-  const arts = published(), a = arts.find(x=>x.id===id); if(!a) return pLibrary();
-  const rel = arts.filter(x=>x.id!==id && (x.cat===a.cat || x.topic===a.topic)).concat(arts.filter(x=>x.id!==id)).filter((v,i,s)=>s.indexOf(v)===i).slice(0,3);
-  const saved = S.saved.article.has(id);
-  return `<section class="page-head"><div class="wrap narrow" style="margin:0 auto">
-   <div class="crumb"><button class="linkbtn" data-act="libtab-go" data-v="articles">Le Journal du Seuil</button> / ${esc(a.cat)}</div>
-   <span class="eyebrow">${esc(a.cat)}</span><h1 style="font-size:clamp(1.9rem,4.4vw,3rem)">${esc(a.title)}</h1>
-   <p class="muted small">${esc(fmtDate(a.date))} · ${a.read} min de lecture</p></div></section>
-  <section class="section" style="padding-top:36px"><div class="wrap narrow stack-lg" style="margin:0 auto">
-   <div class="cover" style="border-radius:var(--r-lg);overflow:hidden;aspect-ratio:16/7;max-width:100%">${cover(a.hue,3)}</div>
-   <div class="prose"><p class="lede">${esc(a.excerpt)}</p>${a.body.map(p=>`<p>${esc(p)}</p>`).join("")}</div>
-   <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:18px">
-    <div class="row small"><span class="muted">Partager :</span><button class="btn btn-soft btn-sm" data-act="copylink" data-id="${a.id}">Copier le lien</button>
-     <a class="btn btn-soft btn-sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(a.title+" — "+location.origin+location.pathname+"#article-"+a.id)}">WhatsApp</a>
-     <a class="btn btn-soft btn-sm" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(location.origin+location.pathname+"#article-"+a.id)}">Facebook</a></div>
-    ${S.user?`<button class="btn ${saved?"btn-primary":"btn-ghost"} btn-sm" data-act="savearticle" data-id="${a.id}">${icon("bookmark")}${saved?"Enregistré":"Enregistrer"}</button>`:""}
-   </div>
-   <div class="notice calm">${icon("info")}<span>Article d’information générale. Pour une situation personnelle, parlez-en à un professionnel de santé.</span></div>
-   <h3>À lire ensuite</h3><div class="grid g3">${rel.map(artCard).join("")}</div>
-  </div></section>`;
-}
-actions["libtab-go"] = (b) => { ui.libTab = b.dataset.v; go("bibliotheque"); };
-actions["copylink"] = (b) => { const url = location.origin + location.pathname + "#article-" + b.dataset.id; try { navigator.clipboard.writeText(url).then(()=>toast("Lien copié"), ()=>toast("Copie impossible ici")); } catch(e) { toast("Copie impossible ici"); } };
-actions["savearticle"] = async (b) => { const on = await store.toggleSaved("article", b.dataset.id); toast(on ? "Article enregistré dans Mon journal" : "Article retiré"); rerender(); };
 
 /* ---------- FAQ, contact, aide ---------- */
 export function pFAQ(){
@@ -348,44 +201,48 @@ export function pLegal(k){ const [t,l,html] = LEGAL[k]; return pageHead("Informa
 
 /* ---------- Connexion ---------- */
 export function pLogin(){
-  if (DEMO) return pageHead("Mon espace","Explorer la maquette","Choisissez un compte de test. Chaque compte montre un forfait ou un rôle différent.") + `
+  if (DEMO) return pageHead("Mon espace","Accéder à mon programme","Maquette : choisissez un compte de test. Chaque compte montre un forfait ou un rôle différent.") + `
    <section class="section"><div class="wrap grid g2" style="align-items:start">
     <div class="card stack"><h3>Comptes de test</h3><div class="stack" style="gap:8px">${api.personas.map(p=>`<button class="persona" data-act="demo-login" data-id="${p.id}">${icon(p.role==="coach"?"chat":p.role==="admin"?"shield":"user")}<span>${esc(p.label)}</span>${icon("arrow")}</button>`).join("")}</div>
      <button class="linkbtn small" data-act="demo-reset" style="align-self:flex-start">Réinitialiser les données de démonstration</button></div>
     <div class="stack-lg"><div class="notice">${icon("info")}<span>Ceci est une maquette : les données sont fictives et restent dans ce navigateur. Ne saisissez pas d’informations personnelles réelles.</span></div>
      <div class="card-flat stack" style="gap:10px"><h4>Vos données sont protégées</h4><ul class="ticks small"><li>Votre journal n’est visible que par vous.</li><li>Votre accompagnante ne voit que ce que vous choisissez de partager.</li><li>Vous pouvez tout effacer depuis Mon compte.</li></ul></div></div>
    </div></section>`;
-  const tabs = `<div class="tabs" role="tablist">${[["login","Se connecter"],["signup","Créer un compte"]].map(([k,l])=>`<button role="tab" data-act="loginmode" data-m="${k}" aria-selected="${ui.loginMode===k}">${l}</button>`).join("")}</div>`;
-  let form;
-  if (ui.loginMode==="signup") form = `<form class="card stack" id="signupform" novalidate>
-    <div class="field"><label for="s-name">Prénom</label><input id="s-name" type="text" autocomplete="given-name" required></div>
-    <div class="field"><label for="s-mail">E-mail</label><input id="s-mail" type="email" autocomplete="email" required></div>
-    <div class="field"><label for="s-pw">Mot de passe</label><input id="s-pw" type="password" autocomplete="new-password" minlength="8" required><span class="hint">Au moins 8 caractères.</span></div>
-    <label class="check"><input id="s-age" type="checkbox" required><span>J’ai 18 ans ou plus.</span></label>
-    <label class="check"><input id="s-cgu" type="checkbox" required><span>J’ai lu la <button type="button" class="linkbtn" data-go="confidentialite">politique de confidentialité</button>, les <button type="button" class="linkbtn" data-go="conditions">conditions d’utilisation</button> et les <button type="button" class="linkbtn" data-go="limites">limites du service</button>.</span></label>
-    <button class="btn btn-gold" type="submit" style="align-self:flex-start">Créer mon compte</button>
-    <p id="s-out" class="small" role="status"></p></form>`;
-  else if (ui.loginMode==="forgot") form = `<form class="card stack" id="forgotform" novalidate>
-    <h3>Mot de passe oublié</h3><p class="muted small">Nous vous envoyons un lien pour choisir un nouveau mot de passe.</p>
-    <div class="field"><label for="f-mail">E-mail</label><input id="f-mail" type="email" autocomplete="email" required></div>
+  const forgot = ui.loginMode === "forgot";
+  const form = forgot ? `<form class="card stack" id="forgotform" novalidate>
+    <h2 class="h-sub" style="margin:0">Mot de passe oublié</h2><p class="muted small">Indiquez l’e-mail de votre accès LE SEUIL. Si un compte existe, vous recevrez un lien à usage unique pour choisir un nouveau mot de passe.</p>
+    <div class="field"><label class="flabel" for="f-mail">E-mail</label><input id="f-mail" type="email" autocomplete="email" required></div>
     <div class="row"><button class="btn btn-primary" type="submit">Envoyer le lien</button><button class="btn btn-soft" type="button" data-act="loginmode" data-m="login">Retour</button></div>
-    <p id="f-out" class="small" role="status"></p></form>`;
-  else form = `<form class="card stack" id="loginform" novalidate>
-    <div class="field"><label for="l-mail">E-mail</label><input id="l-mail" type="email" autocomplete="username" required></div>
-    <div class="field"><label for="l-pw">Mot de passe</label><input id="l-pw" type="password" autocomplete="current-password" required></div>
+    <p id="f-out" class="small" role="status"></p></form>`
+   : `<form class="card stack" id="loginform" novalidate>
+    <div class="field"><label class="flabel" for="l-mail">E-mail</label><input id="l-mail" type="email" autocomplete="username" required></div>
+    <div class="field"><label class="flabel" for="l-pw">Mot de passe</label><input id="l-pw" type="password" autocomplete="current-password" required></div>
     <div class="row" style="justify-content:space-between"><button class="btn btn-primary" type="submit">Se connecter</button><button type="button" class="linkbtn small" data-act="loginmode" data-m="forgot">Mot de passe oublié ?</button></div>
     <p id="l-out" class="small" role="status"></p></form>`;
-  return pageHead("Mon espace","Connexion et inscription","Accédez à votre programme, votre journal et vos objectifs.") + `
+  return pageHead("Se connecter", "Accéder à mon programme", "Réservé aux participants dont l’accès a été créé par l’équipe LE SEUIL.") + `
   <section class="section"><div class="wrap grid g2" style="align-items:start">
-   <div class="stack-lg">${tabs}${form}</div>
-   <div class="card-flat stack" style="gap:10px"><h4>Vos données sont protégées</h4><ul class="ticks small"><li>Votre journal n’est visible que par vous.</li><li>Votre accompagnante ne voit que ce que vous choisissez de partager.</li><li>Vous pouvez tout effacer depuis Mon compte.</li></ul></div>
+   <div class="stack-lg">${form}</div>
+   <div class="stack-lg">
+    <div class="card-flat stack" style="gap:10px"><h2 class="h-card" style="margin:0">Vous n’avez pas encore d’accès ?</h2><p class="small">Les accès aux programmes sont créés par l’équipe LE SEUIL, après votre demande et sa validation. Il n’y a pas d’inscription directe.</p>
+     <button class="btn btn-soft btn-sm" data-go="programmes" style="align-self:flex-start">Découvrir les programmes</button>
+     <p class="small muted">Les articles de la <a href="#bibliotheque" data-go="bibliotheque">Bibliothèque</a> sont en accès libre, sans connexion.</p></div>
+    <div class="card-flat stack" style="gap:10px"><h2 class="h-card" style="margin:0">Vos données sont protégées</h2><ul class="ticks small"><li>Votre journal n’est visible que par vous.</li><li>Votre accompagnante ne voit que ce que vous choisissez de partager.</li><li>Vous pouvez demander l’effacement de vos données.</li></ul></div>
+   </div>
   </div></section>`;
 }
-export function pNewPassword(){
-  return pageHead("Mon espace","Choisir un nouveau mot de passe","") + `<section class="section"><div class="wrap narrow">
-   <form class="card stack" id="newpwform" novalidate><div class="field"><label for="n-pw">Nouveau mot de passe</label><input id="n-pw" type="password" autocomplete="new-password" minlength="8" required><span class="hint">Au moins 8 caractères.</span></div>
-   <button class="btn btn-primary" type="submit" style="align-self:flex-start">Enregistrer</button><p id="n-out" class="small" role="status"></p></form></div></section>`;
+/* Premier accès (lien reçu par e-mail) ou réinitialisation : choix obligatoire du mot de passe personnel. */
+export function pFirstAccess(){
+  if (!S.user) return pageHead("Premier accès", "Ce lien n’est plus valide", "") + `<section class="section"><div class="wrap narrow"><div class="card stack">
+    <p>Le lien utilisé a expiré ou a déjà servi. Pour des raisons de sécurité, chaque lien n’est valable qu’une fois et pour une durée limitée.</p>
+    <p>Demandez un nouveau lien depuis <button class="linkbtn" data-act="goto-forgot">Mot de passe oublié</button>, ou contactez l’équipe LE SEUIL.</p></div></div></section>`;
+  return pageHead("Premier accès", `Bienvenue${S.user.name ? ", " + esc(S.user.name) : ""}`, "Choisissez votre mot de passe personnel pour accéder à votre espace. Il n’est connu que de vous.") + `<section class="section"><div class="wrap narrow">
+   <form class="card stack" id="newpwform" novalidate>
+    <div class="field"><label class="flabel" for="n-pw">Nouveau mot de passe</label><input id="n-pw" type="password" autocomplete="new-password" minlength="10" required><span class="hint">Au moins 10 caractères. Évitez un mot de passe utilisé ailleurs.</span></div>
+    <div class="field"><label class="flabel" for="n-pw2">Confirmer le mot de passe</label><input id="n-pw2" type="password" autocomplete="new-password" minlength="10" required></div>
+    <button class="btn btn-primary" type="submit" style="align-self:flex-start">Enregistrer et accéder à mon espace</button><p id="n-out" class="small" role="status"></p></form></div></section>`;
 }
+export const pNewPassword = pFirstAccess;
+actions["goto-forgot"] = () => { ui.loginMode = "forgot"; go("connexion"); };
 actions["loginmode"] = (b) => { ui.loginMode = b.dataset.m; rerender(); };
 actions["demo-login"] = async (b) => { await store.demoLogin(b.dataset.id); toast("Connecté·e avec un compte de test"); go(homeRoute()); };
 actions["demo-reset"] = async () => { await store.resetDemo(); toast("Données de démonstration réinitialisées"); rerender(); };
@@ -394,7 +251,9 @@ function authError(e){
   if (m.includes("invalid login")) return "E-mail ou mot de passe incorrect.";
   if (m.includes("not confirmed")) return "Confirmez d’abord votre adresse e-mail grâce au lien reçu.";
   if (m.includes("already registered")) return "Un compte existe déjà avec cet e-mail. Connectez-vous.";
-  if (m.includes("password")) return "Le mot de passe doit contenir au moins 8 caractères.";
+  if (m.includes("same password") || m.includes("different from the old")) return "Choisissez un mot de passe différent de l’ancien.";
+  if (m.includes("weak") || m.includes("password should")) return "Ce mot de passe est trop faible. Choisissez-en un plus long.";
+  if (m.includes("banned")) return "Ce compte est suspendu. Contactez l’équipe LE SEUIL.";
   if (m.includes("rate limit")) return "Trop de tentatives. Réessayez dans quelques minutes.";
   return "Une erreur est survenue. Réessayez dans un instant.";
 }
@@ -404,20 +263,12 @@ forms["loginform"] = async (f) => {
   try { await api.signIn($("#l-mail").value.trim(), $("#l-pw").value); await store.loadContent(); await store.loadUser(); toast("Bienvenue"); go(homeRoute()); }
   catch(e) { out("l-out", authError(e)); } finally { busy(f,false); }
 };
-forms["signupform"] = async (f) => {
-  const n=$("#s-name").value.trim(), m=$("#s-mail").value.trim(), pw=$("#s-pw").value;
-  if(!n || !validEmail(m) || pw.length<8 || !$("#s-age").checked || !$("#s-cgu").checked) return out("s-out","Merci de compléter le prénom, un e-mail valide, un mot de passe d’au moins 8 caractères, et de cocher les deux cases.");
-  busy(f,true);
-  try { const r = await api.signUp(n, m, pw);
-    if (r.needsConfirmation) out("s-out", "Presque terminé : ouvrez le lien envoyé à "+m+" pour confirmer votre adresse.", true);
-    else { await store.loadContent(); await store.loadUser(); toast("Compte créé"); go("espace"); } }
-  catch(e) { out("s-out", authError(e)); } finally { busy(f,false); }
-};
 forms["forgotform"] = async (f) => {
   const m=$("#f-mail").value.trim(); if(!validEmail(m)) return out("f-out","Saisissez une adresse e-mail valide.");
   busy(f,true); try { await api.resetPassword(m); out("f-out","Si un compte existe pour cette adresse, un lien vient d’être envoyé.", true); } catch(e) { out("f-out", authError(e)); } finally { busy(f,false); }
 };
 forms["newpwform"] = async (f) => {
-  const pw=$("#n-pw").value; if(pw.length<8) return out("n-out","Au moins 8 caractères.");
-  busy(f,true); try { await api.updatePassword(pw); toast("Mot de passe mis à jour"); go("espace"); } catch(e) { out("n-out", authError(e)); } finally { busy(f,false); }
+  const pw=$("#n-pw").value; if(pw.length<10) return out("n-out","Au moins 10 caractères.");
+  if (pw !== $("#n-pw2").value) return out("n-out","Les deux mots de passe ne correspondent pas.");
+  busy(f,true); try { await api.updatePassword(pw); if (S.profile) S.profile.must_set_password = false; toast("Mot de passe enregistré"); go(homeRoute()); } catch(e) { out("n-out", authError(e)); } finally { busy(f,false); }
 };

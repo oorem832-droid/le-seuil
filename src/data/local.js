@@ -1,9 +1,18 @@
 // Mode démonstration : aucune base de données. Les données fictives vivent dans ce navigateur
 // (localStorage). Les règles de sécurité réelles sont dans Postgres ; ici, seule la logique
 // fonctionnelle est reproduite pour pouvoir explorer la maquette.
-import { ARTICLES, VIDEOS, PLANS, PROGRAMME_01, COACH } from '../content.js';
+import { PLANS, COACH, PROGRAMME_CATALOGUE } from '../content.js';
+import { LIBRARY, LIBRARY_REFERENCES } from '../library.js';
+import { validEnrolment } from './supabase.js';
+// Le contenu des leçons n'est jamais dans le dépôt public : il est chargé seulement s'il existe localement (dossier private/).
+const PRIV = import.meta.glob('../../private/programme01.js', { eager: true });
+const PROGRAMME_01 = Object.values(PRIV)[0]?.PROGRAMME_01 || null;
+// Sans le fichier privé (démo partageable), on affiche des semaines neutres : aucun contenu de leçon réel.
+const PLACEHOLDER_WEEKS = Array.from({ length: 6 }, (_, i) => ({ n: i + 1, title: `Semaine ${i + 1}`, intro: '',
+  steps: [{ id: 'apercu', kind: 'lecon', title: 'Contenu réservé aux participants', required: true,
+    blocks: [{ t: 'p', text: 'Dans cette démonstration, le texte des leçons n’est pas inclus. Sur le site réel, il n’est transmis qu’aux participants inscrits à ce programme, après connexion.' }] }] }));
 
-const KEY = 'leseuil-demo-v3';
+const KEY = 'leseuil-demo-v4';
 const now = () => new Date().toISOString();
 const id = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2));
 const daysFrom = (d, h = 10) => { const x = new Date(); x.setDate(x.getDate() + d); x.setHours(h, 0, 0, 0); return x.toISOString(); };
@@ -18,25 +27,35 @@ export const PERSONAS = [
 
 function seed() {
   const txt = (bl) => Array.isArray(bl) ? bl.map(b => typeof b === 'string' ? b : b.text || (b.items || []).join('\n')).join('\n\n') : (bl || '');
-  const prog = { id: 'p-01', slug: PROGRAMME_01.slug, code: PROGRAMME_01.code, title: PROGRAMME_01.title, summary: PROGRAMME_01.summary, intro: txt(PROGRAMME_01.intro),
-    objectives: PROGRAMME_01.objectives, status: 'demo', cover_hue: 'sage', sort_order: 1, questionnaires_enabled: false, measures: PROGRAMME_01.measures };
+  const progs = PROGRAMME_CATALOGUE.map((c, i) => ({ id: i === 0 ? 'p-01' : 'p-' + c.slug, slug: c.slug, code: c.code, title: c.title, summary: c.summary,
+    intro: PROGRAMME_01 && c.slug === PROGRAMME_01.slug ? txt(PROGRAMME_01.intro) : '', objectives: PROGRAMME_01?.objectives || [], status: c.status, cover_hue: c.hue,
+    sort_order: c.order, questionnaires_enabled: false, measures: PROGRAMME_01?.measures || [], category: c.category, public_intro: c.intro, public_goal: c.goal,
+    benefits: c.benefits, format: 'Leçons interactives, courtes vidéos, exercices et outils pratiques, à votre rythme.', library_categories: c.library, open_for_requests: c.open }));
+  const prog = progs[0];
   const weeks = [], steps = [];
-  PROGRAMME_01.weeks.forEach(w => {
+  (PROGRAMME_01?.weeks || PLACEHOLDER_WEEKS).forEach(w => {
     const wid = `w${w.n}`; weeks.push({ id: wid, programme_id: prog.id, week_number: w.n, title: w.title, intro: txt(w.intro) });
     w.steps.forEach((s, i) => { const { id: key, kind, title, required, ...content } = s;
       steps.push({ id: `${wid}-${key}`, week_id: wid, step_key: key, position: i, kind, title, required: required ?? kind !== 'video', content }); });
   });
   const t = {
-    profiles: PERSONAS.map(p => ({ id: p.id, first_name: p.first_name, email: p.email, role: p.role, newsletter_opt_in: false, analytics_opt_in: false, reminders_opt_in: false, created_at: daysFrom(-30) })),
+    profiles: PERSONAS.map(p => ({ id: p.id, first_name: p.first_name, last_name: 'Démo', email: p.email, role: p.role, account_status: 'active', must_set_password: false, newsletter_opt_in: false, analytics_opt_in: false, reminders_opt_in: false, created_at: daysFrom(-30) })),
     coach_profiles: [{ user_id: COACH.id, display_name: COACH.name, public_title: COACH.title, bio: COACH.bio, verified: COACH.verified, hours: COACH.hours,
       response_delay: COACH.delay, limits: COACH.limits.join('\n'), active: true }],
-    feature_flags: { payments: false, written_support: true, support_calls: true, questionnaires: false, public_signup: true },
-    programmes: [prog], programme_weeks: weeks, programme_steps: steps,
-    articles: ARTICLES.map(a => ({ id: a.id, slug: a.id, title: a.title, category: a.cat, excerpt: a.excerpt, body: a.body, read_minutes: a.read, cover_hue: a.hue, topic_slug: a.topic, status: 'published', published_at: a.date })),
+    feature_flags: { payments: false, written_support: true, support_calls: true, questionnaires: false, public_signup: false },
+    programmes: progs, programme_weeks: weeks, programme_steps: steps,
+    articles: LIBRARY.map(a => ({ id: a.id, slug: a.slug, title: a.title, category: a.category, excerpt: a.chapeau, sections: a.sections, retenir: a.retenir,
+      references_list: LIBRARY_REFERENCES, related: LIBRARY.filter(x => x.category === a.category && x.id !== a.id).slice(0, 3).map(x => x.slug),
+      read_minutes: Math.max(1, Math.ceil(a.words / 200)), cover_hue: ['sage','forest','gold'][a.n % 3], etat: a.professional_review ? 'a_relire' : 'publie',
+      featured: a.featured, featured_order: a.featured_order, sort_order: a.order, sensitive: a.sensitive, professional_review_required: a.professional_review,
+      professional_review_done: false, updated_at: daysFrom(-2) })),
+    article_versions: [], enrolment_requests: [
+      { id: 'r-demo1', programme_slug: 'inquietudes', plan: 'ecrit', first_name: 'Fatou', last_name: 'Exemple', email: 'fatou.exemple@exemple.ci', phone: '', message: 'Demande fictive de démonstration.', is_adult: true, consent: true, status: 'nouvelle', created_at: daysFrom(-1) }],
+    participant_admin_notes: [],
     enrolments: [
-      { id: 'e-awa', user_id: 'u-awa', programme_id: prog.id, plan: 'ecrit', status: 'demo', coach_id: COACH.id, suitability_completed_at: daysFrom(-14), consented_at: daysFrom(-14), share_summaries: true, share_goals: true, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-14) },
-      { id: 'e-koffi', user_id: 'u-koffi', programme_id: prog.id, plan: 'appels', status: 'demo', coach_id: COACH.id, suitability_completed_at: daysFrom(-7), consented_at: daysFrom(-7), share_summaries: false, share_goals: false, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-7) },
-      { id: 'e-mariam', user_id: 'u-mariam', programme_id: prog.id, plan: 'autonome', status: 'demo', coach_id: null, suitability_completed_at: null, consented_at: null, share_summaries: false, share_goals: false, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-1) },
+      { id: 'e-awa', user_id: 'u-awa', programme_id: prog.id, plan: 'ecrit', status: 'active', admission_status: 'admis', payment_status: 'offert', suspended: false, access_expires_at: daysFrom(60), coach_id: COACH.id, suitability_completed_at: daysFrom(-14), consented_at: daysFrom(-14), share_summaries: true, share_goals: true, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-14) },
+      { id: 'e-koffi', user_id: 'u-koffi', programme_id: prog.id, plan: 'appels', status: 'active', admission_status: 'admis', payment_status: 'offert', suspended: false, access_expires_at: daysFrom(60), coach_id: COACH.id, suitability_completed_at: daysFrom(-7), consented_at: daysFrom(-7), share_summaries: false, share_goals: false, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-7) },
+      { id: 'e-mariam', user_id: 'u-mariam', programme_id: prog.id, plan: 'autonome', status: 'active', admission_status: 'admis', payment_status: 'offert', suspended: false, access_expires_at: daysFrom(60), coach_id: null, suitability_completed_at: null, consented_at: null, share_summaries: false, share_goals: false, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-1) },
     ],
     step_progress: [], week_completions: [], exercise_responses: [], journal_entries: [], goals: [], self_ratings: [], shared_summaries: [], saved_items: [],
     messages: [], appointments: [], coach_notes: [], referrals: [], resource_suggestions: [], questionnaire_responses: [], access_log: [],
@@ -59,7 +78,7 @@ function seed() {
     { id: id(), enrolment_id: 'e-koffi', session_number: 2, starts_at: daysFrom(2, 17), duration_minutes: 15, mode: 'telephone', status: 'demande', participant_note: 'Après 17 h', confirmed_at: null });
   t.step_progress.push(...steps.filter(s => s.week_id === 'w1').map(s => ({ enrolment_id: 'e-koffi', step_id: s.id, user_id: 'u-koffi', status: 'completed', completed_at: daysFrom(-4) })));
   t.week_completions.push({ enrolment_id: 'e-koffi', week_number: 1, user_id: 'u-koffi', completed_at: daysFrom(-4) });
-  t.resource_suggestions.push({ id: id(), enrolment_id: 'e-awa', coach_id: COACH.id, kind: 'article', ref: 'dormir-tete', title: 'Dormir quand la tête ne s’arrête pas', note: 'Peut vous aider pour les inquiétudes du soir.', adequacy_reviewed: true, created_at: daysFrom(-2) });
+  t.resource_suggestions.push({ id: id(), enrolment_id: 'e-awa', coach_id: COACH.id, kind: 'article', ref: 'sommeil-sortir-de-la-bataille-contre-la-nuit', title: 'Sommeil : sortir de la bataille contre la nuit', note: 'Peut vous aider pour les inquiétudes du soir.', adequacy_reviewed: true, created_at: daysFrom(-2) });
   return t;
 }
 
@@ -69,7 +88,8 @@ export function createLocalBackend() {
   let uid = null; try { uid = localStorage.getItem(KEY + '-user'); } catch (e) {}
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(T)); if (uid) localStorage.setItem(KEY + '-user', uid); else localStorage.removeItem(KEY + '-user'); } catch (e) {} };
   const me = () => T.profiles.find(p => p.id === uid);
-  const myEnrolment = () => T.enrolments.find(e => e.user_id === uid);
+  let curEid = null;
+  const myEnrolment = () => T.enrolments.find(e => e.id === curEid && e.user_id === uid) || T.enrolments.find(e => e.user_id === uid);
   const eid = () => myEnrolment()?.id;
   const log = (action, enrolment_id, details = {}) => T.access_log.unshift({ id: T.access_log.length + 1, actor_id: uid, actor_role: me()?.role, action, enrolment_id, details, created_at: now() });
   const name = (u) => T.profiles.find(p => p.id === u)?.first_name || '';
@@ -88,38 +108,41 @@ export function createLocalBackend() {
     async demoLogin(personaId) { uid = personaId; persist(); },
     async resetDemo() { T = seed(); uid = null; persist(); },
     async signIn() { deny('Mode démonstration : choisissez un compte de test.'); },
-    async signUp(first_name, email) {
-      const u = 'u-' + id().slice(0, 8);
-      T.profiles.push({ id: u, first_name, email, role: 'member', created_at: now() }); uid = u; persist(); return { needsConfirmation: false };
-    },
     async signOut() { uid = null; persist(); },
-    async resetPassword() {}, async updatePassword() {},
+    async resetPassword() {}, async updatePassword() { const p = me(); if (p) { p.must_set_password = false; persist(); } },
 
     async content(staff) {
       return {
-        articles: T.articles.filter(a => staff || a.status === 'published').map(a => ({ uuid: a.id, id: a.slug, title: a.title, cat: a.category, excerpt: a.excerpt, body: a.body,
-          read: a.read_minutes, date: a.published_at || a.created_at, hue: a.cover_hue, topic: a.topic_slug, status: a.status })),
-        programmes: T.programmes.filter(p => staff || ['demo', 'published'].includes(p.status)).map(p => ({ uuid: p.id, slug: p.slug, code: p.code, title: p.title, summary: p.summary, intro: p.intro,
-          objectives: p.objectives, status: p.status, hue: p.cover_hue, measures: p.measures, questionnaires_enabled: p.questionnaires_enabled, sort: p.sort_order })),
-        videos: VIDEOS.map(v => ({ ...v })),
+        articles: T.articles.filter(a => staff || a.etat === 'publie').sort((a, b) => a.sort_order - b.sort_order).map(a => ({ uuid: a.id, id: a.slug, slug: a.slug, title: a.title, cat: a.category,
+          excerpt: a.excerpt, sections: a.sections || [], body: [a.excerpt], retenir: a.retenir || '', refs: a.references_list || [], related: a.related || [], read: a.read_minutes, hue: a.cover_hue,
+          etat: a.etat, featured: a.featured, featured_order: a.featured_order, order: a.sort_order, sensitive: a.sensitive, review_required: a.professional_review_required,
+          review_done: a.professional_review_done, image_url: a.image_url, image_alt: a.image_alt, updated_at: a.updated_at })),
+        programmes: T.programmes.filter(p => staff || ['demo', 'published'].includes(p.status)).sort((a, b) => a.sort_order - b.sort_order).map(p => ({ uuid: p.id, slug: p.slug, code: p.code,
+          title: p.title, summary: p.summary, intro: p.intro, objectives: p.objectives, status: p.status, hue: p.cover_hue, measures: p.measures, questionnaires_enabled: p.questionnaires_enabled,
+          sort: p.sort_order, category: p.category || '', public_intro: p.public_intro || '', public_goal: p.public_goal || '', benefits: p.benefits || [], format: p.format || '',
+          library_categories: p.library_categories || [], open: p.open_for_requests !== false })),
+        videos: [],
         plans: PLANS.map(p => ({ id: p.id, name: p.name, short: p.short, price: parseInt(p.price.replace(/\D/g, '')), lines: p.lines, featured: !!p.featured })),
         flags: { ...T.feature_flags },
       };
     },
     async weeks(programmeId) {
-      const withSteps = !!uid;
+      const role = me()?.role;
+      const allowed = role === 'admin' || role === 'editor' || role === 'coach' || T.enrolments.some(e => e.user_id === uid && e.programme_id === programmeId && validEnrolment(e) && me()?.account_status !== 'suspended');
+      if (!allowed) return [];
       return T.programme_weeks.filter(w => w.programme_id === programmeId).sort((a, b) => a.week_number - b.week_number).map(w => ({
         uuid: w.id, n: w.week_number, title: w.title, intro: w.intro || '',
-        steps: withSteps ? T.programme_steps.filter(s => s.week_id === w.id).sort((a, b) => a.position - b.position)
-          .map(s => ({ uuid: s.id, key: s.step_key, kind: s.kind, title: s.title, required: s.required, position: s.position, content: s.content })) : [] }));
+        steps: T.programme_steps.filter(s => s.week_id === w.id).sort((a, b) => a.position - b.position)
+          .map(s => ({ uuid: s.id, key: s.step_key, kind: s.kind, title: s.title, required: s.required, position: s.position, content: s.content })) }));
     },
 
-    async participant(programmeId) {
+    async participant(pref) {
       const profile = me();
-      let e = myEnrolment();
-      if (!e && profile.role === 'member') { e = { id: 'e-' + id().slice(0, 8), user_id: uid, programme_id: programmeId, plan: 'autonome', status: 'demo', coach_id: null, share_summaries: false, share_goals: false, questionnaires_enabled: false, unlock_all: false, created_at: now() }; T.enrolments.push(e); persist(); }
+      const enrolments = T.enrolments.filter(x => x.user_id === uid);
+      const e = enrolments.find(x => x.id === pref) || enrolments.find(validEnrolment) || enrolments[0] || null;
+      curEid = e?.id || null;
       const by = (t) => e ? T[t].filter(r => r.enrolment_id === e.id) : [];
-      return { profile, enrolment: e || null, progress: by('step_progress'), completions: by('week_completions'), responses: by('exercise_responses'),
+      return { profile, enrolments, enrolment: e || null, progress: by('step_progress'), completions: by('week_completions'), responses: by('exercise_responses'),
         journal: T.journal_entries.filter(j => j.user_id === uid).sort((a, b) => b.created_at.localeCompare(a.created_at)),
         goals: by('goals'), ratings: by('self_ratings'), summaries: by('shared_summaries'), saved: T.saved_items.filter(s => s.user_id === uid),
         messages: by('messages').sort((a, b) => a.created_at.localeCompare(b.created_at)), appointments: by('appointments').sort((a, b) => a.session_number - b.session_number),
@@ -250,7 +273,7 @@ export function createLocalBackend() {
     // ---------- Administration ----------
     async overview() {
       return { members: T.profiles.filter(p => p.role === 'member').length, coaches: T.profiles.filter(p => p.role === 'coach').length, enrolments: T.enrolments.length,
-        published_articles: T.articles.filter(a => a.status === 'published').length, open_privacy_requests: T.privacy_requests.filter(r => r.status !== 'done').length,
+        published_articles: T.articles.filter(a => a.etat === 'publie').length, open_privacy_requests: T.privacy_requests.filter(r => r.status !== 'done').length,
         unread_contact: T.contact_messages.filter(c => !c.handled).length, open_referrals: T.referrals.filter(r => r.status === 'ouverte').length };
     },
     async stats() { const total = T.enrolments.length; return [1, 2, 3, 4, 5, 6].map(n => ({ week_number: n, completed: total < 5 ? null : T.week_completions.filter(c => c.week_number === n).length, enrolled: total })); },
@@ -273,13 +296,56 @@ export function createLocalBackend() {
     async accessLog() { return T.access_log.slice(0, 200); },
     async referralsAll() { return T.referrals; },
     async saveArticle(slug, d) {
-      if (slug === 'new') T.articles.unshift({ id: d.slug, slug: d.slug, title: d.title, category: d.cat, excerpt: d.excerpt, body: d.body, read_minutes: d.read, cover_hue: d.hue, status: d.status, published_at: d.status === 'published' ? now() : null });
-      else { const a = T.articles.find(x => x.slug === slug); Object.assign(a, { title: d.title, category: d.cat, excerpt: d.excerpt, body: d.body, read_minutes: d.read, status: d.status });
-        if (d.status === 'published' && !a.published_at) a.published_at = now(); }
+      if (d.etat === 'publie' && d.review_required && !d.review_done) deny('Cet article doit être relu par un professionnel qualifié avant publication.');
+      const row = { title: d.title, category: d.cat, excerpt: d.excerpt, sections: d.sections, retenir: d.retenir, references_list: d.refs, related: d.related, read_minutes: d.read,
+        etat: d.etat, featured: d.featured, featured_order: d.featured_order || null, sort_order: d.order || 0, sensitive: d.sensitive, professional_review_required: d.review_required,
+        professional_review_done: d.review_done, image_url: d.image_url || null, image_alt: d.image_alt || null, updated_at: now() };
+      if (slug === 'new') T.articles.push({ id: 'a-' + id().slice(0, 6), slug: d.slug, cover_hue: d.hue, ...row });
+      else { const a = T.articles.find(x => x.slug === slug); T.article_versions.unshift({ id: id(), article_id: a.id, created_at: now(), snapshot: { ...a } }); Object.assign(a, row); }
       persist();
     },
+    async articleVersions(uuid) { return T.article_versions.filter(v => v.article_id === uuid).slice(0, 20); },
+    async submitRequest(r) { T.enrolment_requests.unshift({ id: id(), ...r, status: 'nouvelle', created_at: now() }); persist(); },
+    async requests() { return T.enrolment_requests; },
+    async updateRequest(rid, patch) { Object.assign(T.enrolment_requests.find(r => r.id === rid), patch, { updated_at: now() }); persist(); },
+    async participants() {
+      return T.enrolments.map(e => { const p = T.profiles.find(x => x.id === e.user_id) || {}; const pr = T.programmes.find(x => x.id === e.programme_id) || {};
+        return { enrolment_id: e.id, user_id: e.user_id, first_name: p.first_name, last_name: p.last_name || '', email: p.email, programme_id: pr.id, programme: pr.title, plan: e.plan,
+          status: e.status, payment_status: e.payment_status, admission_status: e.admission_status, access_starts_at: e.access_starts_at || null, access_expires_at: e.access_expires_at || null,
+          suspended: !!e.suspended, account_status: p.account_status || 'active', must_set_password: !!p.must_set_password, last_sign_in_at: p.must_set_password ? null : daysFrom(-1),
+          coach_id: e.coach_id, coach_name: T.coach_profiles.find(c => c.user_id === e.coach_id)?.display_name || null, questionnaires_enabled: e.questionnaires_enabled,
+          weeks_completed: T.week_completions.filter(c => c.enrolment_id === e.id).length, created_at: e.created_at }; });
+    },
+    async createParticipant(d) {
+      if (T.profiles.some(p => p.email?.toLowerCase() === d.email.toLowerCase())) deny('Un compte existe déjà avec cet e-mail.');
+      const u = 'u-' + id().slice(0, 8);
+      T.profiles.push({ id: u, first_name: d.first_name, last_name: d.last_name, email: d.email, role: 'member', account_status: 'active', must_set_password: true, created_at: now() });
+      const e = { id: 'e-' + id().slice(0, 8), user_id: u, programme_id: d.programme_id, plan: d.plan, status: 'active', payment_status: d.payment_status, admission_status: d.admission_status,
+        access_starts_at: d.access_starts_at || null, access_expires_at: d.access_expires_at || null, suspended: false, coach_id: d.plan === 'autonome' ? null : d.coach_id || null,
+        share_summaries: false, share_goals: false, questionnaires_enabled: false, created_at: now() };
+      T.enrolments.push(e);
+      if (d.admin_note) T.participant_admin_notes.unshift({ id: id(), user_id: u, body: d.admin_note, created_at: now() });
+      log(d.send_now ? 'admin_create_participant_and_invite' : 'admin_create_participant', e.id, { user: u }); persist();
+      return { ok: true, user_id: u, enrolment_id: e.id, invited: !!d.send_now };
+    },
+    async sendAccess(userId) { const p = T.profiles.find(x => x.id === userId); p.must_set_password = true; log('admin_send_access', null, { user: userId }); persist(); return { ok: true, method: 'invite' }; },
+    async setAccountStatus(userId, status) { T.profiles.find(x => x.id === userId).account_status = status; log('admin_account_' + status, null, { user: userId }); persist(); },
+    async saveEnrolment(r) {
+      const e = T.enrolments.find(x => x.id === r.enrolment_id);
+      Object.assign(e, { plan: r.plan, coach_id: r.plan === 'autonome' ? null : r.coach_id || null, questionnaires_enabled: r.plan === 'autonome' ? false : !!r.questionnaires_enabled,
+        status: r.status, payment_status: r.payment_status, admission_status: r.admission_status, access_starts_at: r.access_starts_at || null, access_expires_at: r.access_expires_at || null, suspended: !!r.suspended });
+      log('admin_save_enrolment', e.id, { plan: r.plan }); persist();
+    },
+    async addEnrolment(userId, d) {
+      const e = { id: 'e-' + id().slice(0, 8), user_id: userId, programme_id: d.programme_id, plan: d.plan, status: 'active', payment_status: d.payment_status, admission_status: d.admission_status,
+        access_starts_at: d.access_starts_at || null, access_expires_at: d.access_expires_at || null, suspended: false, coach_id: d.plan === 'autonome' ? null : d.coach_id || null, created_at: now() };
+      T.enrolments.push(e); log('admin_add_enrolment', e.id, { user: userId }); persist(); return e.id;
+    },
+    async adminNotes(userId) { return T.participant_admin_notes.filter(n => n.user_id === userId); },
+    async addAdminNote(userId, body) { T.participant_admin_notes.unshift({ id: id(), user_id: userId, body, created_at: now() }); persist(); },
     async saveProgramme(p) {
-      const row = { title: p.title, summary: p.summary, intro: p.intro, objectives: p.objectives, status: p.status, code: p.code, questionnaires_enabled: !!p.questionnaires_enabled, measures: p.measures, cover_hue: p.hue };
+      const row = { title: p.title, summary: p.summary, intro: p.intro, objectives: p.objectives, status: p.status, code: p.code, questionnaires_enabled: !!p.questionnaires_enabled, measures: p.measures, cover_hue: p.hue,
+        category: p.category, public_intro: p.public_intro, public_goal: p.public_goal, benefits: p.benefits, format: p.format, library_categories: p.library_categories, open_for_requests: p.open !== false };
       if (p.uuid) Object.assign(T.programmes.find(x => x.id === p.uuid), row);
       else { const pid = 'p-' + id().slice(0, 8); T.programmes.push({ id: pid, slug: p.slug, sort_order: T.programmes.length + 1, ...row });
         [1, 2, 3, 4, 5, 6].forEach(n => T.programme_weeks.push({ id: `${pid}-w${n}`, programme_id: pid, week_number: n, title: `Semaine ${n}`, intro: '' })); p.uuid = pid; }

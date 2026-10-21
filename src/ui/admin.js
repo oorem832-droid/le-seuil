@@ -5,9 +5,10 @@ import { esc, icon, fmtDate, toast, $, blocksToText, textToBlocks } from "./util
 import { ui, actions, forms, changes, rerender, go } from "./state.js";
 import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
+import { aRequests, aParticipants, aLibrary } from "./admin2.js";
 
 const A = ui.admin;
-const TABS = [["vue","Vue d’ensemble","chart"],["programmes","Programmes","path"],["articles","Articles","book"],["inscriptions","Inscriptions","users"],["equipe","Équipe et accompagnantes","user"],["fonctionnalites","Fonctionnalités","bell"],["contact","Messages de contact","chat"],["confidentialite","Confidentialité et traçabilité","shield"]];
+const TABS = [["vue","Vue d’ensemble","chart"],["demandes","Demandes d’inscription","bell"],["participants","Participants","users"],["bibliotheque","Bibliothèque","book"],["programmes","Programmes","path"],["equipe","Équipe et accompagnantes","user"],["fonctionnalites","Fonctionnalités","bell"],["contact","Messages de contact","chat"],["confidentialite","Confidentialité et traçabilité","shield"]];
 const PLAN = { autonome: "Autonome", ecrit: "Accompagnement écrit", appels: "Accompagnement par appels" };
 const ROLE = { member: "Participant", editor: "Rédaction", coach: "Accompagnante", admin: "Administration" };
 const STATUS = { draft: "Brouillon", demo: "Maquette (visible)", published: "Publié", archived: "Archivé" };
@@ -23,16 +24,16 @@ const drop = (...keys) => keys.forEach(k => { delete A[k]; });
 const loading = `<p class="muted">Chargement…</p>`;
 function shell(inner, tab){
   return `<div class="wrap app"><nav class="side" aria-label="Administration"><div class="who"><span class="eyebrow">Administration</span><div class="who-name">${esc(S.user.name)}</div><span class="small muted">${ROLE[S.user.role]}</span></div>
-   ${TABS.filter(([k]) => S.user.role === "admin" || ["programmes","articles"].includes(k)).map(([k,l,i])=>`<button data-act="a-tab" data-v="${k}" ${tab===k?'aria-current="page"':""}>${icon(i)}<span>${l}</span></button>`).join("")}
+   ${TABS.filter(([k]) => S.user.role === "admin" || ["programmes","bibliotheque"].includes(k)).map(([k,l,i])=>`<button data-act="a-tab" data-v="${k}" ${tab===k?'aria-current="page"':""}>${icon(i)}<span>${l}</span></button>`).join("")}
    <button data-act="logout">${icon("out")}<span>Se déconnecter</span></button></nav><div class="stack-lg fade-in" style="min-width:0">${inner}</div></div>`;
 }
 const H = (t, extra="", lede="") => `<div class="section-head" style="margin:0"><div class="stack" style="gap:6px"><span class="eyebrow">Administration</span><h1 class="h-page">${t}</h1>${lede?`<p class="muted">${lede}</p>`:""}</div>${extra}</div>`;
-actions["a-tab"] = async (b) => { ui.adminTab = b.dataset.v; ui.editing = null; ui.confirm = null; drop("overview","stats","enrolments","team","coaches","privacy","contact","log","referrals","programmes","articles"); A.prog = null; A.progId = null; await store.loadContent(); go("admin"); };
+actions["a-tab"] = async (b) => { ui.adminTab = b.dataset.v; ui.editing = null; ui.confirm = null; drop("overview","stats","enrolments","team","coaches","privacy","contact","log","referrals","programmes","articles","requests","participants","versions"); ui.newParticipant = null; ui.partSel = null; A.prog = null; A.progId = null; await store.loadContent(); go("admin"); };
 
 export function aMain(){
   const t = ui.adminTab;
-  if (S.user.role === "editor" && !["programmes","articles"].includes(t)) ui.adminTab = "programmes";
-  return ({ vue: aOverview, programmes: aProgrammes, articles: aArticles, inscriptions: aEnrolments, equipe: aTeam, fonctionnalites: aFlags, contact: aContact, confidentialite: aPrivacy }[ui.adminTab] || aOverview)();
+  if (S.user.role === "editor" && !["programmes","bibliotheque"].includes(t)) ui.adminTab = "bibliotheque";
+  return ({ vue: aOverview, demandes: () => aRequests(shell), participants: () => aParticipants(shell), bibliotheque: () => aLibrary(shell), articles: () => aLibrary(shell), inscriptions: () => aParticipants(shell), programmes: aProgrammes, equipe: aTeam, fonctionnalites: aFlags, contact: aContact, confidentialite: aPrivacy }[ui.adminTab] || aOverview)();
 }
 
 /* ---------- Vue d'ensemble ---------- */
@@ -80,6 +81,14 @@ export function aProgramme(id){
      <div class="field"><label class="flabel" for="pg-code">Numéro</label><input id="pg-code" type="text" value="${esc(p.code||"")}"></div>
      <div class="field"><label class="flabel" for="pg-status">Statut</label><select id="pg-status">${Object.entries(STATUS).map(([k,l])=>`<option value="${k}" ${p.status===k?"selected":""}>${l}</option>`).join("")}</select></div></div>
     <div class="field"><label class="flabel" for="pg-sum">Résumé</label><textarea id="pg-sum" rows="2">${esc(p.summary)}</textarea></div>
+    <fieldset class="card-lite stack"><legend class="flabel">Page de présentation publique</legend><p class="small muted">Visible par tous. N’y mettez ni leçon, ni script vidéo, ni exercice détaillé, ni questionnaire.</p>
+     <div class="grid g2" style="gap:12px"><div class="field"><label class="flabel" for="pg-cat">Catégorie</label><input id="pg-cat" type="text" value="${esc(p.category||"")}"></div>
+      <label class="check" style="align-self:end"><input type="checkbox" id="pg-open" ${p.open!==false?"checked":""}><span>Demandes d’inscription ouvertes</span></label></div>
+     <div class="field"><label class="flabel" for="pg-pintro">Courte introduction (le visiteur reconnaît ses difficultés)</label><textarea id="pg-pintro" rows="2">${esc(p.public_intro||"")}</textarea></div>
+     <div class="field"><label class="flabel" for="pg-goal">Objectif général du programme</label><textarea id="pg-goal" rows="3">${esc(p.public_goal||"")}</textarea></div>
+     <div class="field"><label class="flabel" for="pg-ben">Bénéfices d’apprentissage (3 ou 4, un par ligne, sans promesse de guérison)</label><textarea id="pg-ben" rows="4">${esc((p.benefits||[]).join("\n"))}</textarea></div>
+     <div class="field"><label class="flabel" for="pg-format">Format</label><input id="pg-format" type="text" value="${esc(p.format||"")}"></div>
+     <div class="field"><label class="flabel" for="pg-lib">Catégories de la Bibliothèque liées (une par ligne)</label><textarea id="pg-lib" rows="2">${esc((p.library_categories||[]).join("\n"))}</textarea></div></fieldset>
     <div class="field"><label class="flabel" for="pg-intro">Présentation</label><textarea id="pg-intro" rows="4">${esc(Array.isArray(p.intro)?p.intro.join("\n\n"):p.intro)}</textarea></div>
     <div class="field"><label class="flabel" for="pg-obj">Objectifs pédagogiques (un par ligne)</label><textarea id="pg-obj" rows="4">${esc((p.objectives||[]).join("\n"))}</textarea></div>
     <div class="field"><label class="flabel" for="pg-measure">Autoévaluation 0–10 (question posée au début et dans chaque bilan)</label><input id="pg-measure" type="text" value="${esc(m.label||"")}"></div>
@@ -92,7 +101,9 @@ forms["a-progform"] = async () => {
   const p = A.prog, m = p.measures?.[0] || { key: "impact", min: "Pas du tout", max: "Énormément" };
   const label = $("#pg-measure").value.trim();
   const upd = { ...p, title: $("#pg-title").value.trim(), code: $("#pg-code").value.trim(), status: $("#pg-status").value, summary: $("#pg-sum").value.trim(), intro: $("#pg-intro").value.trim(),
-    objectives: $("#pg-obj").value.split("\n").map(x=>x.trim()).filter(Boolean), questionnaires_enabled: $("#pg-q").checked, measures: label ? [{ ...m, label }] : [] };
+    objectives: $("#pg-obj").value.split("\n").map(x=>x.trim()).filter(Boolean), questionnaires_enabled: $("#pg-q").checked, measures: label ? [{ ...m, label }] : [],
+    category: $("#pg-cat").value.trim(), open: $("#pg-open").checked, public_intro: $("#pg-pintro").value.trim(), public_goal: $("#pg-goal").value.trim(),
+    benefits: $("#pg-ben").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,4), format: $("#pg-format").value.trim(), library_categories: $("#pg-lib").value.split("\n").map(x=>x.trim()).filter(Boolean) };
   try { await api.saveProgramme(upd); A.prog = upd; drop("programmes"); await store.loadContent(); toast(upd.status==="draft"?"Enregistré (brouillon, non visible)":"Programme enregistré"); rerender(); }
   catch(e) { console.error(e); toast("Enregistrement impossible."); }
 };
@@ -169,58 +180,6 @@ forms["a-stepform"] = async (f) => {
   catch(e) { console.error(e); $("#st-out").textContent = "Enregistrement impossible."; }
 };
 
-/* ---------- Articles ---------- */
-function aArticles(){
-  need("articles", async () => (await api.content(true)).articles);
-  const list = A.articles || [];
-  const a = ui.editing ? (ui.editing==="new" ? {id:"",title:"",cat:ART_CATS[0],read:5,excerpt:"",body:[""],status:"draft"} : list.find(x=>x.id===ui.editing)) : null;
-  return shell(`${H("Articles du Journal", a?"":`<button class="btn btn-primary" data-act="a-newart">${icon("plus")}Nouvel article</button>`)}
-   ${a?`<form class="card stack" id="artform"><h2 class="h-sub" style="margin:0">${ui.editing==="new"?"Nouvel article":"Modifier l’article"}</h2>
-     <div class="field"><label class="flabel" for="a-title">Titre</label><input id="a-title" type="text" value="${esc(a.title)}" required></div>
-     <div class="grid g3" style="gap:12px"><div class="field"><label class="flabel" for="a-cat">Rubrique</label><select id="a-cat">${ART_CATS.map(c=>`<option ${c===a.cat?"selected":""}>${c}</option>`).join("")}</select></div>
-      <div class="field"><label class="flabel" for="a-read">Temps de lecture (min)</label><input id="a-read" type="text" inputmode="numeric" value="${a.read}"></div>
-      <div class="field"><label class="flabel" for="a-status">Statut</label><select id="a-status"><option value="draft" ${a.status!=="published"?"selected":""}>Brouillon</option><option value="published" ${a.status==="published"?"selected":""}>Publié</option></select></div></div>
-     <div class="field"><label class="flabel" for="a-ex">Chapeau</label><textarea id="a-ex" rows="2">${esc(a.excerpt)}</textarea></div>
-     <div class="field"><label class="flabel" for="a-body">Texte</label><textarea id="a-body" rows="12">${esc(a.body.join("\n\n"))}</textarea><span class="hint">Séparez les paragraphes par une ligne vide.</span></div>
-     <div class="row"><button class="btn btn-primary" type="submit">Enregistrer</button><button class="btn btn-soft" type="button" data-act="a-cancel">Annuler</button></div><p id="a-out" class="small" role="status"></p></form>`:""}
-   <div class="table-wrap"><table><thead><tr><th>Titre</th><th>Rubrique</th><th>Date</th><th>Statut</th><th></th></tr></thead><tbody>
-    ${A.articles ? list.map(x=>`<tr><td><b>${esc(x.title)}</b></td><td>${esc(x.cat)}</td><td class="num">${esc(fmtDate(x.date))}</td><td><span class="badge ${x.status==="published"?"ok":""}">${x.status==="published"?"Publié":"Brouillon"}</span></td><td><div class="row" style="flex-wrap:nowrap"><button class="btn btn-soft btn-sm" data-act="a-editart" data-id="${x.id}">Modifier</button>${x.status==="published"?`<button class="btn btn-soft btn-sm" data-go="article-${x.id}">Voir</button>`:""}</div></td></tr>`).join("") : `<tr><td colspan="5">${loading}</td></tr>`}
-   </tbody></table></div>`, "articles");
-}
-actions["a-newart"] = () => { ui.editing = "new"; rerender(); };
-actions["a-editart"] = (b) => { ui.editing = b.dataset.id; rerender(); window.scrollTo({ top: 0, behavior: "smooth" }); };
-forms["artform"] = async () => {
-  const title = $("#a-title").value.trim(); if (!title) { $("#a-out").textContent = "Ajoutez un titre."; return; }
-  const prev = (A.articles||[]).find(x => x.id === ui.editing);
-  const d = { title, cat: $("#a-cat").value, read: parseInt($("#a-read").value) || 5, excerpt: $("#a-ex").value.trim(), status: $("#a-status").value,
-    body: $("#a-body").value.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean), wasPublished: prev?.status === "published",
-    slug: title.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,60) + "-" + Date.now().toString(36).slice(-4),
-    hue: ["sage","forest","gold"][Math.floor(Math.random()*3)] };
-  try { await api.saveArticle(ui.editing, d); ui.editing = null; drop("articles"); await store.loadContent(); toast(d.status==="published"?"Article publié":"Brouillon enregistré"); rerender(); }
-  catch(e) { console.error(e); $("#a-out").textContent = "Enregistrement impossible."; }
-};
-
-/* ---------- Inscriptions ---------- */
-function aEnrolments(){
-  need("enrolments", () => api.enrolments()); need("team", () => api.team());
-  const coaches = (A.team||[]).filter(t => t.role === "coach" || t.role === "admin");
-  return shell(`${H("Inscriptions et forfaits", "", "Tant que le paiement n’est pas ouvert, le forfait et l’accompagnante sont attribués ici. Aucune donnée privée des participants n’apparaît.")}
-   <div class="notice">${icon("lock")}<span>Paiement en ligne ${C.flags.payments?"activé":"désactivé"}. Il sera branché côté serveur après validation juridique (prestataire mobile money).</span></div>
-   <div class="table-wrap"><table><thead><tr><th>Participant</th><th>Programme</th><th>Forfait</th><th>Accompagnante</th><th>Questionnaires</th><th class="c">Semaines</th><th></th></tr></thead><tbody>
-    ${A.enrolments ? A.enrolments.map(r=>`<tr data-row="${r.enrolment_id}"><td><b>${esc(r.first_name||"—")}</b><div class="small muted">${fmtDate(r.created_at)}</div></td><td>${esc(r.programme)}</td>
-      <td><select class="sel-inline" id="pl-${r.enrolment_id}">${Object.entries(PLAN).map(([k,l])=>`<option value="${k}" ${r.plan===k?"selected":""}>${l}</option>`).join("")}</select></td>
-      <td><select class="sel-inline" id="co-${r.enrolment_id}"><option value="">—</option>${coaches.map(c=>`<option value="${c.id}" ${r.coach_id===c.id?"selected":""}>${esc(c.first_name)}</option>`).join("")}</select></td>
-      <td><label class="check small"><input type="checkbox" id="qn-${r.enrolment_id}" ${r.questionnaires_enabled?"checked":""}><span>Activer</span></label></td>
-      <td class="c num">${r.weeks_completed} / 6</td><td><button class="btn btn-soft btn-sm" data-act="a-saveenr" data-id="${r.enrolment_id}">Enregistrer</button></td></tr>`).join("") || `<tr><td colspan="7" class="muted">Aucune inscription.</td></tr>` : `<tr><td colspan="7">${loading}</td></tr>`}
-   </tbody></table></div>
-   <p class="small muted">Questionnaires : sans effet pour le forfait Autonome, et tant que la fonctionnalité générale et le programme ne les autorisent pas.</p>`, "inscriptions");
-}
-actions["a-saveenr"] = async (b) => {
-  const id = b.dataset.id, plan = $("#pl-"+id).value, coach = $("#co-"+id).value;
-  if (plan !== "autonome" && !coach) { toast("Choisissez une accompagnante pour ce forfait."); return; }
-  try { await api.updateEnrolment(id, plan, coach || null, $("#qn-"+id).checked); drop("enrolments"); toast("Inscription mise à jour"); rerender(); } catch(e) { console.error(e); toast("Mise à jour impossible."); }
-};
-
 /* ---------- Équipe et accompagnantes ---------- */
 function aTeam(){
   need("team", () => api.team()); need("coaches", () => api.coachProfiles());
@@ -259,8 +218,7 @@ forms["a-roleform"] = async () => {
 const FL = [["payments","Paiement en ligne","Après validation juridique et choix du prestataire (mobile money, carte). Le paiement se fait côté serveur."],
   ["written_support","Accompagnement écrit (forfait 2)","Après validation du cadre, des limites, des délais et de la procédure d’orientation."],
   ["support_calls","Échanges par appels (forfait 3)","Après validation du cadre, des limites, des délais et de la procédure d’orientation."],
-  ["questionnaires","Questionnaires PHQ-9 / GAD-7 (forfaits 2 et 3)","Après validation de la supervision, des délais de revue, du consentement et de la réponse aux risques. Jamais pour le forfait Autonome."],
-  ["public_signup","Création de comptes","Ouvre l’inscription gratuite au programme de démonstration."]];
+  ["questionnaires","Questionnaires PHQ-9 / GAD-7 (forfaits 2 et 3)","Après validation de la supervision, des délais de revue, du consentement et de la réponse aux risques. Jamais pour le forfait Autonome."]];
 function aFlags(){
   return shell(`${H("Fonctionnalités", "", "Activez une fonctionnalité uniquement lorsque ses prérequis sont validés. Chaque changement est enregistré dans le journal de traçabilité.")}
    <div class="stack">${FL.map(([k,l,req])=>`<div class="card flag-row"><div class="stack" style="gap:4px;min-width:0"><b>${l}</b><span class="small muted">${req}</span></div>

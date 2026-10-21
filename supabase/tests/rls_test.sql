@@ -1,4 +1,7 @@
--- Tests des règles d'accès (RLS). À exécuter sur une base de TEST uniquement (jamais en production).
+-- ⚠️ NE PAS EXÉCUTER DANS SUPABASE. Fichier de test pour développeurs, via psql sur une base locale jetable.
+-- Il crée de faux comptes et modifie les données. Pour installer la base, utilisez uniquement
+-- migrations/*.sql puis seed.sql.
+-- Tests des règles d'accès (RLS).
 -- Local : psql -f local_stub.sql -f ../migrations/20261019000000_init.sql -f ../seed.sql -f rls_test.sql
 -- Chaque ligne affiche PASS ou FAIL.
 \set QUIET on
@@ -27,14 +30,14 @@ insert into coach_profiles(user_id, display_name, verified) values ('00000000-00
 set role authenticated;
 -- Each participant enrols (demo autonome)
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000a1',false);
-insert into enrolments(user_id, programme_id) select auth.uid(), id from programmes where slug='inquietudes';
+reset role; insert into enrolments(user_id, programme_id, status, admission_status) select current_setting('request.jwt.claim.sub')::uuid, id, 'active', 'admis' from programmes where slug='inquietudes'; set role authenticated;
 select t_err('member cannot self-enrol in paid plan', $$insert into enrolments(user_id, programme_id, plan) select auth.uid(), id from programmes limit 1$$);
 select t_err('member cannot change own plan', $$update enrolments set plan='ecrit'$$);
 select t_err('member cannot change own role', $$update profiles set role='admin' where id=auth.uid()$$);
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000b1',false);
-insert into enrolments(user_id, programme_id) select auth.uid(), id from programmes where slug='inquietudes';
+reset role; insert into enrolments(user_id, programme_id, status, admission_status) select current_setting('request.jwt.claim.sub')::uuid, id, 'active', 'admis' from programmes where slug='inquietudes'; set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c1',false);
-insert into enrolments(user_id, programme_id) select auth.uid(), id from programmes where slug='inquietudes';
+reset role; insert into enrolments(user_id, programme_id, status, admission_status) select current_setting('request.jwt.claim.sub')::uuid, id, 'active', 'admis' from programmes where slug='inquietudes'; set role authenticated;
 
 -- Admin sets plans and coach
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000f1',false);
@@ -127,14 +130,14 @@ select coach_review_questionnaire((select (coach_participant(enrolment_id)->'que
 select t_ok('Reviewed', (select needs_attention = 0 from coach_participants() where first_name='Awa'));
 -- Anonymous
 reset role; set role anon; select set_config('request.jwt.claim.sub','',false);
-select t_rows('anon sees 6 weeks outline', 'select * from programme_weeks', 6);
+select t_rows('anon sees no weeks (lessons private)', 'select * from programme_weeks', 0);
 select t_rows('anon sees 0 step content', 'select * from programme_steps', 0);
 select t_rows('anon sees coach profile', 'select * from coach_profiles', 1);
 insert into contact_messages(name,email,subject,message,consent) values ('n','e@x','s','m',true);
 select t_err('anon cannot read contact', $$select 1/0 from contact_messages having count(*) > 0$$);
 set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-0000000000c1',false);
-select t_err('member cannot self-enrol in paid plan', $$insert into enrolments(user_id, programme_id, plan) select auth.uid(), id, 'appels' from programmes limit 1$$);
+select t_err('member cannot self-enrol', $$insert into enrolments(user_id, programme_id, plan) select auth.uid(), id, 'appels' from programmes limit 1$$);
 select t_err('member cannot self-assign coach', $$insert into enrolments(user_id, programme_id, coach_id) select auth.uid(), id, '00000000-0000-0000-0000-0000000000d1' from programmes limit 1$$);
 select t_rows('member cannot read contact', 'select * from contact_messages', 0);
 select t_rows('member cannot read access log', 'select * from access_log', 0);

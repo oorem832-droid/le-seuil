@@ -2,8 +2,11 @@
 // ce fichier ne fait que traduire les appels.
 import { createClient } from '@supabase/supabase-js';
 
+export const validEnrolment = (e) => e && ['demo', 'active', 'completed'].includes(e.status) && !e.suspended && e.admission_status === 'admis'
+  && (!e.access_starts_at || new Date(e.access_starts_at) <= new Date()) && (!e.access_expires_at || new Date(e.access_expires_at) > new Date());
+
 export function createSupabaseBackend(url, key) {
-  const sb = createClient(url, key, { auth: { flowType: 'pkce', persistSession: true, detectSessionInUrl: true } });
+  const sb = createClient(url, key, { auth: { flowType: 'implicit', persistSession: true, detectSessionInUrl: true } });
   const ok = (r) => { if (r.error) throw r.error; return r.data; };
   let uid = null, eid = null;
   const base = () => location.origin + location.pathname;
@@ -12,7 +15,13 @@ export function createSupabaseBackend(url, key) {
   const mapWeek = (w) => ({ uuid: w.id, n: w.week_number, title: w.title, intro: w.intro || '',
     steps: (w.programme_steps || []).sort((a, b) => a.position - b.position).map(mapStep) });
   const mapProg = (p) => ({ uuid: p.id, slug: p.slug, code: p.code, title: p.title, summary: p.summary, intro: p.intro, objectives: p.objectives || [],
-    status: p.status, hue: p.cover_hue, measures: p.measures || [], questionnaires_enabled: p.questionnaires_enabled, sort: p.sort_order });
+    status: p.status, hue: p.cover_hue, measures: p.measures || [], questionnaires_enabled: p.questionnaires_enabled, sort: p.sort_order,
+    category: p.category || '', public_intro: p.public_intro || '', public_goal: p.public_goal || '', benefits: p.benefits || [], format: p.format || '',
+    library_categories: p.library_categories || [], open: p.open_for_requests !== false });
+  const mapArt = (a) => ({ uuid: a.id, id: a.slug, slug: a.slug, title: a.title, cat: a.category, excerpt: a.excerpt, sections: a.sections || [],
+    body: a.body || [], retenir: a.retenir || '', refs: a.references_list || [], related: a.related || [], read: a.read_minutes, hue: a.cover_hue,
+    etat: a.etat, featured: a.featured, featured_order: a.featured_order, order: a.sort_order, sensitive: a.sensitive,
+    review_required: a.professional_review_required, review_done: a.professional_review_done, image_url: a.image_url, image_alt: a.image_alt, updated_at: a.updated_at });
 
   return {
     mode: 'supabase',
@@ -31,28 +40,22 @@ export function createSupabaseBackend(url, key) {
     },
     async user() { const { data } = await sb.auth.getUser(); return data.user; },
     async signIn(email, password) { const r = await sb.auth.signInWithPassword({ email, password }); if (r.error) throw r.error; uid = r.data.user.id; },
-    async signUp(first_name, email, password) {
-      const r = await sb.auth.signUp({ email, password, options: { emailRedirectTo: base() + '#espace', data: { first_name, is_adult: true } } });
-      if (r.error) throw r.error; if (r.data.session) uid = r.data.user.id; return { needsConfirmation: !r.data.session };
-    },
     async signOut() { await sb.auth.signOut(); uid = null; eid = null; },
-    async resetPassword(email) { ok(await sb.auth.resetPasswordForEmail(email, { redirectTo: base() + '#nouveau-mot-de-passe' })); },
-    async updatePassword(password) { ok(await sb.auth.updateUser({ password })); },
+    async resetPassword(email) { ok(await sb.auth.resetPasswordForEmail(email, { redirectTo: base() + '#premier-acces' })); },
+    async updatePassword(password) { ok(await sb.auth.updateUser({ password })); await sb.rpc('mark_password_set'); },
 
     // ---------- Contenus ----------
     async content(staff) {
-      const [arts, progs, vids, plans, flags] = await Promise.all([
-        sb.from('articles').select('*').order('published_at', { ascending: false, nullsFirst: true }),
+      const [arts, progs, plans, flags] = await Promise.all([
+        sb.from('articles').select('*').order('sort_order'),
         sb.from('programmes').select('*').order('sort_order'),
-        sb.from('videos').select('*').order('sort_order'),
         sb.from('plans').select('*').order('sort_order'),
         sb.from('feature_flags').select('key, enabled'),
       ]);
       return {
-        articles: ok(arts).filter(a => staff || a.status === 'published').map(a => ({ uuid: a.id, id: a.slug, title: a.title, cat: a.category, excerpt: a.excerpt,
-          body: a.body || [], read: a.read_minutes, date: a.published_at || a.created_at, hue: a.cover_hue, topic: a.topic_slug, status: a.status })),
+        articles: ok(arts).filter(a => staff || a.etat === 'publie').map(mapArt),
         programmes: ok(progs).map(mapProg),
-        videos: ok(vids).map(v => ({ uuid: v.id, title: v.title, who: [v.speaker, v.credentials].filter(Boolean).join(' · '), len: v.duration_label, desc: v.description, url: v.video_url, transcript: v.transcript })),
+        videos: [],
         plans: ok(plans).map(p => ({ id: p.tier, name: p.name, short: p.short_name, price: p.price_fcfa, lines: p.features, featured: p.tier === 'ecrit' })),
         flags: Object.fromEntries(ok(flags).map(f => [f.key, f.enabled])),
       };
@@ -63,15 +66,12 @@ export function createSupabaseBackend(url, key) {
     },
 
     // ---------- Participant ----------
-    async participant(programmeId) {
+    async participant(preferredEnrolment) {
       const profile = ok(await sb.from('profiles').select('*').eq('id', uid).single());
-      let enrolment = null;
-      if (profile.role === 'member' || profile.role === 'admin' || profile.role === 'editor') {
-        enrolment = ok(await sb.from('enrolments').select('*').eq('user_id', uid).eq('programme_id', programmeId).maybeSingle());
-        if (!enrolment && profile.role === 'member') enrolment = ok(await sb.from('enrolments').insert({ user_id: uid, programme_id: programmeId }).select().single());
-      }
+      const enrolments = ok(await sb.from('enrolments').select('*').eq('user_id', uid).order('created_at'));
+      const enrolment = enrolments.find(e => e.id === preferredEnrolment) || enrolments.find(validEnrolment) || enrolments[0] || null;
       eid = enrolment?.id || null;
-      const out = { profile, enrolment, progress: [], completions: [], responses: [], journal: [], goals: [], ratings: [], summaries: [], saved: [],
+      const out = { profile, enrolments, enrolment, progress: [], completions: [], responses: [], journal: [], goals: [], ratings: [], summaries: [], saved: [],
         messages: [], appointments: [], suggestions: [], coach: null, questionnaires: [] };
       const [saved, journal] = await Promise.all([sb.from('saved_items').select('*'), sb.from('journal_entries').select('*').order('created_at', { ascending: false })]);
       out.saved = ok(saved); out.journal = ok(journal);
@@ -151,14 +151,40 @@ export function createSupabaseBackend(url, key) {
     async accessLog() { return ok(await sb.from('access_log').select('*').order('created_at', { ascending: false }).limit(200)); },
     async referralsAll() { return ok(await sb.from('referrals').select('*').order('created_at', { ascending: false })); },
     async saveArticle(slug, d) {
-      const row = { title: d.title, category: d.cat, read_minutes: d.read, excerpt: d.excerpt, body: d.body, status: d.status };
-      if (d.status === 'published' && !d.wasPublished) row.published_at = new Date().toISOString();
+      const row = { title: d.title, category: d.cat, excerpt: d.excerpt, body: [d.excerpt], sections: d.sections, retenir: d.retenir, references_list: d.refs,
+        related: d.related, read_minutes: d.read, etat: d.etat, featured: d.featured, featured_order: d.featured_order || null, sort_order: d.order || 0,
+        sensitive: d.sensitive, professional_review_required: d.review_required, professional_review_done: d.review_done,
+        image_url: d.image_url || null, image_alt: d.image_alt || null };
+      if (d.review_done && !d.wasReviewed) { row.reviewed_by = uid; row.reviewed_at = new Date().toISOString(); }
       if (slug === 'new') ok(await sb.from('articles').insert({ ...row, slug: d.slug, author_id: uid, cover_hue: d.hue }));
       else ok(await sb.from('articles').update(row).eq('slug', slug));
     },
+    async articleVersions(uuid) { return ok(await sb.from('article_versions').select('id, created_at, snapshot').eq('article_id', uuid).order('created_at', { ascending: false }).limit(20)); },
+    // Demandes d'inscription
+    async submitRequest(r) { ok(await sb.from('enrolment_requests').insert(r)); },
+    async requests() { return ok(await sb.from('enrolment_requests').select('*').order('created_at', { ascending: false })); },
+    async updateRequest(id, patch) { ok(await sb.from('enrolment_requests').update({ ...patch, handled_by: uid }).eq('id', id)); },
+    // Participants (fonction serveur pour la création des comptes et l'envoi des accès)
+    async participants() { return ok(await sb.rpc('admin_enrolments')); },
+    async adminFn(payload) {
+      const { data, error } = await sb.functions.invoke('admin-participants', { body: payload });
+      if (error) { let msg = error.message; try { msg = (await error.context.json()).error || msg; } catch (e) {} throw new Error(msg); }
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    async createParticipant(d) { return this.adminFn({ action: 'create', ...d }); },
+    async sendAccess(userId) { return this.adminFn({ action: 'send_access', user_id: userId }); },
+    async setAccountStatus(userId, status) { return this.adminFn({ action: 'set_account_status', user_id: userId, status }); },
+    async saveEnrolment(e) { ok(await sb.rpc('admin_save_enrolment', { eid: e.enrolment_id, new_plan: e.plan, new_coach: e.coach_id || null, new_questionnaires: !!e.questionnaires_enabled,
+      new_status: e.status, new_payment: e.payment_status, new_admission: e.admission_status, new_starts: e.access_starts_at || null, new_expires: e.access_expires_at || null, new_suspended: !!e.suspended })); },
+    async addEnrolment(userId, d) { return ok(await sb.rpc('admin_add_enrolment', { target: userId, prog: d.programme_id, new_plan: d.plan, new_payment: d.payment_status,
+      new_admission: d.admission_status, new_starts: d.access_starts_at || null, new_expires: d.access_expires_at || null, new_coach: d.coach_id || null })); },
+    async adminNotes(userId) { return ok(await sb.from('participant_admin_notes').select('*').eq('user_id', userId).order('created_at', { ascending: false })); },
+    async addAdminNote(userId, body) { ok(await sb.from('participant_admin_notes').insert({ user_id: userId, body, author_id: uid })); },
     async saveProgramme(p) {
       const row = { title: p.title, summary: p.summary, intro: p.intro, objectives: p.objectives, status: p.status, code: p.code,
-        questionnaires_enabled: !!p.questionnaires_enabled, measures: p.measures, cover_hue: p.hue };
+        questionnaires_enabled: !!p.questionnaires_enabled, measures: p.measures, cover_hue: p.hue, category: p.category, public_intro: p.public_intro,
+        public_goal: p.public_goal, benefits: p.benefits, format: p.format, library_categories: p.library_categories, open_for_requests: p.open !== false };
       if (p.uuid) return mapProg(ok(await sb.from('programmes').update(row).eq('id', p.uuid).select().single()));
       const created = ok(await sb.from('programmes').insert({ ...row, slug: p.slug }).select().single());
       await sb.from('programme_weeks').insert([1, 2, 3, 4, 5, 6].map(n => ({ programme_id: created.id, week_number: n, title: `Semaine ${n}` })));
