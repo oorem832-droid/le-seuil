@@ -3,7 +3,7 @@
 import { esc, icon, cover, pageHead, fcfa, toast, $ } from "./util.js";
 import { ui, actions, forms, rerender, go } from "./state.js";
 import { C, DEMO, api } from "../store.js";
-import { CATALOGUE_SIZE } from "../content.js";
+import { CATALOGUE_SIZE, EVALUATION_QUESTIONS, EVALUATION_NOTICE } from "../content.js";
 import { publishedArticles, articleCard, catSlug } from "./library.js";
 
 const visible = () => C.programmes.filter(p => ["demo", "published"].includes(p.status)).sort((a, b) => (a.sort || 0) - (b.sort || 0));
@@ -75,6 +75,7 @@ function requestForm(p, sel){
   if (ui.reqSent === p.slug) return `<div class="card stack" role="status"><h2 class="h-sub">${icon("check")} Votre demande a bien été transmise</h2>
     <p>Merci. L’équipe LE SEUIL va examiner votre demande et l’adéquation du programme à votre situation. Nous vous recontacterons par e-mail pour la suite, notamment le paiement.</p>
     <p class="small muted">Aucun compte n’a été créé. Votre accès vous sera envoyé par e-mail une fois votre demande validée.</p>
+    <p class="small muted">${icon("phone")} ${esc(EVALUATION_NOTICE)}</p>
     <button class="btn btn-soft btn-sm" data-act="req-again" style="align-self:flex-start">Faire une autre demande</button></div>`;
   return `<form class="card stack" id="requestform" novalidate aria-labelledby="req-h">
    <h2 class="h-sub" id="req-h">Demande d’inscription</h2>
@@ -85,6 +86,15 @@ function requestForm(p, sel){
     <div class="field"><label class="flabel" for="rq-last">Nom</label><input id="rq-last" type="text" autocomplete="family-name" maxlength="100" required></div></div>
    <div class="grid g2" style="gap:14px"><div class="field"><label class="flabel" for="rq-mail">E-mail</label><input id="rq-mail" type="email" autocomplete="email" maxlength="320" required></div>
     <div class="field"><label class="flabel" for="rq-phone">Téléphone (facultatif)</label><input id="rq-phone" type="tel" autocomplete="tel" maxlength="40"></div></div>
+   <fieldset class="stack eval-fs"><legend class="h-card">Mon évaluation initiale</legend>
+    <p class="small muted">Ces questions confidentielles aident l’équipe à vérifier que le programme vous convient. Ce n’est pas un diagnostic.</p>
+    <div class="notice" role="note">${icon("phone")}<span>${esc(EVALUATION_NOTICE)}</span></div>
+    ${EVALUATION_QUESTIONS.map(q => { const id = "ev-" + q.k, lab = `<label class="flabel" for="${id}">${esc(q.label)}${q.required ? " *" : ""}</label>`, hint = q.hint ? `<span class="hint">${esc(q.hint)}</span>` : "";
+      const attr = q.plan ? ` data-plan-only="${q.plan}"` : "";
+      if (q.type === "choice") return `<fieldset class="field"${attr}><legend class="flabel">${esc(q.label)}</legend><div class="row">${q.options.map((o, i) => `<label class="check small"><input type="radio" name="${id}" value="${esc(o)}"><span>${esc(o)}</span></label>`).join("")}</div>${hint}</fieldset>`;
+      if (q.type === "textarea") return `<div class="field"${attr}>${lab}<textarea id="${id}" rows="3" maxlength="1500"></textarea>${hint}</div>`;
+      return `<div class="field"${attr}>${lab}<input id="${id}" type="text" maxlength="300">${hint}</div>`; }).join("")}
+   </fieldset>
    <div class="field"><label class="flabel" for="rq-msg">Message (facultatif)</label><textarea id="rq-msg" rows="3" maxlength="2000"></textarea><span class="hint">Merci de ne pas partager ici d’informations détaillées sur votre santé.</span></div>
    <label class="check"><input id="rq-adult" type="checkbox"><span>J’ai 18 ans ou plus.</span></label>
    <label class="check"><input id="rq-ok" type="checkbox"><span>J’accepte que ces informations soient utilisées uniquement pour traiter ma demande (voir la <a href="#confidentialite" data-go="confidentialite">politique de confidentialité</a>).</span></label>
@@ -98,10 +108,13 @@ forms["requestform"] = async (f) => {
   const plan = f.querySelector('input[name="rq-plan"]:checked')?.value;
   const r = { programme_slug: $("#rq-prog").value, plan, first_name: $("#rq-first").value.trim(), last_name: $("#rq-last").value.trim(), email: $("#rq-mail").value.trim(),
     phone: $("#rq-phone").value.trim() || null, message: $("#rq-msg").value.trim() || null, is_adult: $("#rq-adult").checked, consent: $("#rq-ok").checked };
+  r.evaluation = Object.fromEntries(EVALUATION_QUESTIONS.filter(q => !q.plan || q.plan === plan).map(q => [q.k,
+    q.type === "choice" ? (f.querySelector(`input[name="ev-${q.k}"]:checked`)?.value || "") : ($("#ev-" + q.k)?.value.trim() || "")]).filter(([, v]) => v));
   if (!plan) return out("Choisissez une formule.");
   if (!r.first_name || !r.last_name || !/^\S+@\S+\.\S+$/.test(r.email)) return out("Merci d’indiquer votre prénom, votre nom et un e-mail valide.");
   if (!r.is_adult) return out("Les programmes s’adressent aux adultes de 18 ans et plus.");
   if (!r.consent) return out("Merci d’accepter l’utilisation de vos informations pour traiter votre demande.");
+  if (EVALUATION_QUESTIONS.some(q => q.required && !r.evaluation[q.k])) return out("Merci de répondre à la première question de votre évaluation initiale.");
   const btn = f.querySelector('button[type="submit"]'); btn.disabled = true;
   try { await api.submitRequest(r); ui.reqSent = r.programme_slug; ui.reqPlan = ""; rerender(); toast(DEMO ? "Maquette : demande enregistrée dans ce navigateur" : "Demande envoyée"); }
   catch (e) { console.error(e); out("L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez."); btn.disabled = false; }

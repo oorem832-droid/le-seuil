@@ -42,6 +42,9 @@ export function memberShell(inner, active = ui.route){
 const H = (eyebrow, title, lede="") => `<div class="stack" style="gap:6px"><span class="eyebrow">${eyebrow}</span><h1 class="h-page">${title}</h1>${lede?`<p class="muted">${lede}</p>`:""}</div>`;
 actions["logout"] = async () => { await store.signOut(); toast("Vous êtes déconnecté·e"); go("accueil"); };
 
+/* Mon point de départ : étape à compléter en premier (lien vers l'exercice s'il n'est pas terminé) */
+const departTodo = () => { const w = C.weeks[0]; if (!w) return null; const i = w.steps.findIndex(s => s.content?.baseline); return i >= 0 && S.progress[w.steps[i].uuid] !== "completed" ? `semaine-1-${i}` : null; };
+
 /* ---------- Tableau de bord ---------- */
 export function mDash(){
   if (!S.enrolment || !store.enrolmentValid()) {
@@ -69,6 +72,7 @@ export function mDash(){
      <h2 class="h-sub">${start ? "Avant de commencer" : `Semaine ${n} : ${esc(w?.title||"")}`}</h2>
      <p class="muted small">${start ? "Quelques questions et votre consentement, puis vous pourrez commencer la semaine 1." : `${lsDone} leçon${lsDone>1?"s":""} terminée${lsDone>1?"s":""} sur ${ls.length}`}</p>
      <div class="row"><button class="btn btn-primary" data-act="continue">${start ? "Commencer mon programme" : "Continuer mon programme"} ${icon("arrow")}</button></div>
+     ${!start && departTodo() ? `<p class="small">${icon("flag")} Commencez par <button class="linkbtn" data-go="${departTodo()}">Mon point de départ</button> : il sera relu à mi-parcours et à la fin.</p>` : ""}
     </div>
    </div>
    <div class="grid g2">
@@ -511,6 +515,7 @@ export function mAccount(){
      <label class="check"><input type="checkbox" data-pref="analytics_opt_in" ${S.profile?.analytics_opt_in?"checked":""}><span>Autoriser des statistiques anonymes d’utilisation</span></label>
      <p class="small muted">Vos réponses et votre journal ne sont jamais utilisés à des fins statistiques individuelles.</p></div>
     <div class="card stack"><h2 class="h-sub" style="margin:0">Confidentialité et données</h2>
+     <p class="small">Ce que voit l’équipe LE SEUIL : votre programme, votre formule, les leçons terminées et la date de votre dernière activité. ${store.plan() !== "autonome" ? "Votre accompagnante voit aussi vos messages, et vos bilans et objectifs uniquement si vous choisissez de les partager." : ""} Votre journal personnel et le contenu de vos exercices restent privés.</p>
      <div class="row"><button class="btn btn-soft btn-sm" data-act="export-data">${icon("download")}Télécharger mes données</button>${DEMO?"":`<button class="btn btn-soft btn-sm" data-act="privreq" data-t="erasure">Demander la suppression de mon compte</button>`}</div>
      ${ui.confirm==="wipe"?`<p class="small"><b>Effacer toutes vos données de programme ? Exercices, journal, objectifs et progression seront définitivement supprimés.</b></p><div class="row"><button class="btn btn-primary btn-sm" data-act="wipe">Oui, tout effacer</button><button class="btn btn-soft btn-sm" data-act="nowipe">Annuler</button></div>`:`<button class="btn btn-ghost btn-sm" data-act="askwipe" style="align-self:flex-start">Effacer mes données de programme</button>`}</div>
    </div>`);

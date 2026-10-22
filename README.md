@@ -81,6 +81,7 @@ Avec Supabase : copier `.env.example` en `.env.local` et renseigner l’URL et l
    - `supabase/migrations/20261019000100_storage.sql`
    - `supabase/migrations/20261021000000_bibliotheque_comptes_admin.sql`
    - `supabase/migrations/20261022000000_acces_paiement_confirme.sql`
+   - `supabase/migrations/20261023000000_espace_accompagnante.sql`
    - `supabase/seed.sql` (formules, présentation publique des programmes, 62 articles en « à relire »)
    - le contenu privé des programmes, qui **n’est pas dans ce dépôt** (voir « Contenus privés »).
 3. Ne **jamais** exécuter les fichiers de `supabase/tests/` dans Supabase.
@@ -93,6 +94,14 @@ Avec Supabase : copier `.env.example` en `.env.local` et renseigner l’URL et l
    - `programme-02.sql` ;
    - `programme-03.sql`.
 4. Les leçons ne s'ouvrent que si l'inscription est à la fois « Admis » et « Payé » ou « Offert ». Vérifiez ces deux statuts pour les inscriptions existantes dans Administration → Participants.
+
+### Mise à jour « Espace accompagnante »
+1. Exécuter `supabase/migrations/20261023000000_espace_accompagnante.sql`. Le fichier peut être relancé sans risque.
+2. Redéployer la fonction `admin-participants` avec le nouveau contenu de `supabase/functions/admin-participants/index.ts`. Elle applique désormais la règle de double authentification.
+3. **Authentication → Multi-Factor** : vérifier que **TOTP** est activé (c'est le réglage par défaut de Supabase).
+4. Se connecter, ouvrir **Paramètres et sécurité**, activer la double authentification avec une application (Google Authenticator, Microsoft Authenticator, 2FAS…), puis cocher « Exiger la double authentification pour toute l'équipe ».
+5. Dans **Paramètres et sécurité**, renseigner vos disponibilités et votre délai de réponse P2. Votre fiche d'accompagnante est alors créée.
+6. Dans **Administration → Équipe et accompagnantes**, compléter votre présentation publique.
 
 ### Comptes : aucune inscription publique
 1. **Authentication → Sign In / Providers** : désactiver **Allow new users to sign up**. Seule l’administration crée les comptes.
@@ -141,6 +150,31 @@ Le texte des leçons ne doit pas être placé dans ce dépôt. Les dossiers `pri
 
 La clé `anon` peut être publique : la protection repose sur les règles RLS. **Ne jamais** placer la clé `service_role` dans le site.
 
+## Espace accompagnante
+
+Après connexion :
+- un compte **administratrice/accompagnante** ou **accompagnante** arrive sur l'Espace accompagnante (après saisie du code de double authentification, si elle est activée) ;
+- un participant arrive sur « Mon espace » ;
+- un visiteur ne voit que les pages publiques. Aucun lien public ne mène à l'espace privé.
+
+Menu de l'administratrice : Tableau de bord · Demandes et évaluations initiales · Mes participants · Messages et échanges · Agenda et rendez-vous · Mes tâches · Gestion des programmes · Administration · Paramètres et sécurité · Déconnexion.
+
+Une accompagnante qui n'est pas administratrice ne voit que ses participants. Elle n'a accès ni aux demandes, ni à l'administration, ni à la gestion des programmes.
+
+Ce que la base de données garantit (tests `rls_test_espace.sql`) :
+- **Double authentification** : si un compte d'équipe a activé la MFA, ou si elle est rendue obligatoire, toutes les données privées exigent une session vérifiée (aal2). Masquer un bouton ne suffit pas : la base refuse.
+- **Périmètre** : l'administration voit toutes les inscriptions (données administratives et progression). Messages, notes de suivi et bilans sont réservés à l'accompagnante attribuée. Un second administrateur ne les lit pas.
+- **Notes de suivi** : champs structurés, versions conservées à chaque modification, archivage au lieu de suppression, suppression éventuelle tracée. Elles ne sont jamais visibles par le participant. L'export pour une demande d'accès légale est tracé ; pour l'administration, il exige un motif.
+- **Forfaits** :
+  - P2 : messagerie, bilans et suivi du délai de réponse annoncé.
+  - P3 : six rendez-vous de 15 minutes, statuts (prévu, effectué, reporté, annulé, manqué), créneaux limités aux disponibilités, messages logistiques uniquement.
+  - P1 : aucun échange.
+- **Demandes** :
+  - statuts : nouvelle, en cours d'examen, informations complémentaires demandées, acceptée, orientation proposée, non retenue, compte créé ;
+  - chaque changement est tracé ;
+  - un visiteur ne peut ni lire les demandes ni en préremplir l'examen.
+- **Évaluation initiale** : évaluation des besoins et de l'adéquation, jamais un diagnostic. Aucune question sur le risque suicidaire n'est posée, faute de capacité de réponse en temps réel. Le formulaire rappelle qu'il n'est pas lu en temps réel.
+
 ## Qui voit quoi
 
 | Donnée | Participant | Accompagnante attribuée | Administration |
@@ -164,7 +198,7 @@ Autres règles :
 - **Progression réelle** : ouvrir une page ne termine rien. Une leçon se termine par « J’ai terminé cette leçon ». Un exercice se termine seulement quand ses champs obligatoires sont remplis.
 - Le participant peut exporter ses données, effacer ses données de programme ou demander la suppression de son compte.
 
-Tests : `supabase/tests/rls_test.sql` (55), `rls_test_v3.sql` (27) et `rls_test_programmes.sql` (13, isolement entre programmes) passent tous sur une base Postgres locale. Ne pas les exécuter dans Supabase.
+Tests : `supabase/tests/rls_test.sql` (55), `rls_test_v3.sql` (27), `rls_test_programmes.sql` (12, isolement entre programmes) et `rls_test_espace.sql` (51, Espace accompagnante et double authentification) passent tous sur une base Postgres locale. Ne pas les exécuter dans Supabase.
 
 ## Ajouter ou modifier un programme
 
@@ -210,3 +244,9 @@ Tests : `supabase/tests/rls_test.sql` (55), `rls_test_v3.sql` (27) et `rls_test_
 - [ ] Politique de conservation : tâche de suppression automatique, sauvegardes, procédure d’incident
 - [ ] Tournage des vidéos, sous-titres et transcriptions
 - [ ] Tests utilisateurs, accessibilité, nom de domaine et expéditeur d’e-mails
+- [ ] Double authentification activée pour chaque compte d'équipe, puis rendue obligatoire
+- [ ] Accès au tableau de bord Supabase limité à la fondatrice : les propriétaires du projet Supabase peuvent techniquement lire toutes les tables. Ne pas donner ce rôle au développeur une fois le site livré (moindre privilège).
+- [ ] Sauvegardes : activer les sauvegardes et la restauration à un instant donné (offre Supabase payante), puis tester une restauration
+- [ ] Région d'hébergement, contrat de sous-traitance (DPA) avec Supabase, formalités auprès de l'ARTCI pour des données sensibles
+- [ ] Durées de conservation des dossiers et des notes ; procédure de rectification et de demande d'accès ; procédure d'incident de sécurité
+- [ ] Validation des questions de « Mon évaluation initiale » et des consignes d'urgence (numéros vérifiés)

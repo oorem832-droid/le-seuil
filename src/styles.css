@@ -429,3 +429,36 @@ details.recall summary{cursor:pointer}
 /* Catalogue : une carte seule ne s'étire pas sur toute la largeur */
 .prog-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
 .recall p.small{font-family:inherit}
+
+/* ---------- Espace accompagnante ---------- */
+.kpis-wide{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.kpi-btn{font:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px;color:inherit;transition:border-color .15s,transform .15s}
+.kpi-btn:hover{border-color:var(--sage);transform:translateY(-1px)}
+.staff .bar-row{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 54px}
+.plan-split{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.plan-chip{background:var(--ivory);border:1px solid var(--line);border-radius:var(--r-md);padding:12px;display:flex;flex-direction:column;gap:4px}
+.plan-chip b{font-family:var(--f-display);font-weight:400;font-size:1.7rem;color:var(--forest)}
+.mini-bar{height:8px;background:var(--beige);border-radius:999px;overflow:hidden;min-width:80px;margin-bottom:3px}
+.mini-bar i{display:block;height:100%;background:var(--sage);border-radius:999px}
+table.parts td{vertical-align:top}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px 18px;margin:0}
+.facts div{min-width:0} .facts dt{font-size:.8rem;color:var(--muted);font-weight:600} .facts dd{margin:2px 0 0;overflow-wrap:anywhere}
+.facts-wide{grid-template-columns:1fr}
+.entry.note{border-left:3px solid var(--sage)} .entry.note.archived{opacity:.65;border-left-color:var(--line)}
+.versions{background:var(--ivory);border-radius:var(--r-md);padding:8px 12px}
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.slot{border:1px solid var(--line);border-radius:var(--r-md);padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.slot .appt{padding:0;border:0;background:none}
+.tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.tasks li{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:space-between;border-bottom:1px dashed var(--line);padding-bottom:8px}
+.tasks li.done span{text-decoration:line-through;color:var(--muted)}
+.warn-fg{color:var(--warn-fg);font-weight:600}
+.notice.warn{border:1px solid var(--gold)}
+.qr{background:#fff;border-radius:12px;padding:8px;border:1px solid var(--line)}
+.eval-fs{border:1px solid var(--line);border-radius:var(--r-md);padding:14px 16px;margin:0}
+.eval-fs legend{padding:0 6px}
+.staff .side button span{white-space:normal;text-align:left}
+details > summary.h-sub{cursor:pointer}
+.nowrap{white-space:nowrap}
+.plan-chip span{overflow-wrap:anywhere;font-size:.82rem}
+table.parts th,table.parts td{padding-left:10px;padding-right:10px}

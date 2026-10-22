@@ -12,7 +12,7 @@ const PLACEHOLDER_WEEKS = Array.from({ length: 6 }, (_, i) => ({ n: i + 1, title
   steps: [{ id: 'apercu', kind: 'lecon', title: 'Contenu réservé aux participants', required: true,
     blocks: [{ t: 'p', text: 'Dans cette démonstration, le texte des leçons n’est pas inclus. Sur le site réel, il n’est transmis qu’aux participants inscrits à ce programme, après connexion.' }] }] }));
 
-const KEY = 'leseuil-demo-v5';
+const KEY = 'leseuil-demo-v6';
 const now = () => new Date().toISOString();
 const id = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2));
 const daysFrom = (d, h = 10) => { const x = new Date(); x.setDate(x.getDate() + d); x.setHours(h, 0, 0, 0); return x.toISOString(); };
@@ -21,8 +21,8 @@ export const PERSONAS = [
   { id: 'u-awa', first_name: 'Awa', email: 'awa.test@leseuil.ci', role: 'member', label: 'Awa · forfait 2, accompagnement écrit' },
   { id: 'u-koffi', first_name: 'Koffi', email: 'koffi.test@leseuil.ci', role: 'member', label: 'Koffi · forfait 3, appels' },
   { id: 'u-mariam', first_name: 'Mariam', email: 'mariam.test@leseuil.ci', role: 'member', label: 'Mariam · forfait 1, autonome' },
-  { id: COACH.id, first_name: 'Judie', email: 'judie.test@leseuil.ci', role: 'coach', label: 'Judie Ore · Espace accompagnante' },
-  { id: 'u-admin', first_name: 'Administration', email: 'admin.test@leseuil.ci', role: 'admin', label: 'Administration' },
+  { id: COACH.id, first_name: 'Judie', email: 'judie.test@leseuil.ci', role: 'admin', label: 'Judie Ore · administratrice et accompagnante' },
+  { id: 'u-coach2', first_name: 'Accompagnante', email: 'accompagnante.test@leseuil.ci', role: 'coach', label: 'Une autre accompagnante · rôle limité (exemple)' },
 ];
 
 function seed() {
@@ -45,7 +45,7 @@ function seed() {
   const t = {
     profiles: PERSONAS.map(p => ({ id: p.id, first_name: p.first_name, last_name: 'Démo', email: p.email, role: p.role, account_status: 'active', must_set_password: false, newsletter_opt_in: false, analytics_opt_in: false, reminders_opt_in: false, created_at: daysFrom(-30) })),
     coach_profiles: [{ user_id: COACH.id, display_name: COACH.name, public_title: COACH.title, bio: COACH.bio, verified: COACH.verified, hours: COACH.hours,
-      response_delay: COACH.delay, limits: COACH.limits.join('\n'), active: true }],
+      response_delay: COACH.delay, limits: COACH.limits.join('\n'), active: true, availability: { days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' }, response_hours: 48 }],
     feature_flags: { payments: false, written_support: true, support_calls: true, questionnaires: false, public_signup: false },
     programmes: progs, programme_weeks: weeks, programme_steps: steps,
     articles: LIBRARY.map(a => ({ id: a.id, slug: a.slug, title: a.title, category: a.category, excerpt: a.chapeau, sections: a.sections, retenir: a.retenir,
@@ -54,7 +54,11 @@ function seed() {
       featured: a.featured, featured_order: a.featured_order, sort_order: a.order, sensitive: a.sensitive, professional_review_required: a.professional_review,
       professional_review_done: false, updated_at: daysFrom(-2) })),
     article_versions: [], enrolment_requests: [
-      { id: 'r-demo1', programme_slug: 'inquietudes', plan: 'ecrit', first_name: 'Fatou', last_name: 'Exemple', email: 'fatou.exemple@exemple.ci', phone: '', message: 'Demande fictive de démonstration.', is_adult: true, consent: true, status: 'nouvelle', created_at: daysFrom(-1) }],
+      { id: 'r-demo1', programme_slug: 'inquietudes', plan: 'ecrit', first_name: 'Fatou', last_name: 'Exemple', email: 'fatou.exemple@exemple.ci', phone: '', message: 'Demande fictive de démonstration.', is_adult: true, consent: true, status: 'nouvelle', created_at: daysFrom(-1),
+        evaluation: { motif: 'Exemple fictif : je m’inquiète beaucoup pour mon travail depuis quelques mois.', duree: '1 à 6 mois', attentes: 'Mieux comprendre mes inquiétudes et avoir des outils.', suivi: 'Non', adaptation: '', disponibilites: 'En soirée' } },
+      { id: 'r-demo-awa', programme_slug: 'inquietudes', plan: 'ecrit', first_name: 'Awa', last_name: 'Démo', email: 'awa.test@leseuil.ci', phone: '+225 00 00 00 00 (fictif)', message: '', is_adult: true, consent: true, status: 'compte_cree', created_at: daysFrom(-16),
+        user_id: 'u-awa', enrolment_id: 'e-awa', review_result: 'Demande adaptée au programme 01. Pas de situation d’urgence signalée.', decision_note: 'Acceptée ; formule 2 confirmée.', reviewed_at: daysFrom(-15),
+        evaluation: { motif: 'Exemple fictif : inquiétudes le soir, difficultés à m’endormir.', duree: 'Plus de 6 mois', attentes: 'Ruminer moins le soir.', suivi: 'Non', adaptation: 'Préfère l’écrit.', disponibilites: '' } }],
     participant_admin_notes: [],
     enrolments: [
       { id: 'e-awa', user_id: 'u-awa', programme_id: prog.id, plan: 'ecrit', status: 'active', admission_status: 'admis', payment_status: 'offert', suspended: false, access_expires_at: daysFrom(60), coach_id: COACH.id, suitability_completed_at: daysFrom(-14), consented_at: daysFrom(-14), share_summaries: true, share_goals: true, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-14) },
@@ -64,7 +68,7 @@ function seed() {
     ],
     step_progress: [], week_completions: [], exercise_responses: [], journal_entries: [], goals: [], self_ratings: [], shared_summaries: [], saved_items: [],
     messages: [], appointments: [], coach_notes: [], referrals: [], resource_suggestions: [], questionnaire_responses: [], access_log: [],
-    contact_messages: [], privacy_requests: [],
+    contact_messages: [], privacy_requests: [], staff_tasks: [], coach_note_versions: [],
   };
   // Awa : semaines 1 et 2 terminées
   steps.filter(s => s.week_id === 'w1' || s.week_id === 'w2').forEach(s => t.step_progress.push({ enrolment_id: 'e-awa', step_id: s.id, user_id: 'u-awa', status: 'completed', completed_at: daysFrom(-10) }));
@@ -83,6 +87,10 @@ function seed() {
     { id: id(), enrolment_id: 'e-koffi', session_number: 2, starts_at: daysFrom(2, 17), duration_minutes: 15, mode: 'telephone', status: 'demande', participant_note: 'Après 17 h', confirmed_at: null });
   t.step_progress.push(...steps.filter(s => s.week_id === 'w1').map(s => ({ enrolment_id: 'e-koffi', step_id: s.id, user_id: 'u-koffi', status: 'completed', completed_at: daysFrom(-4) })));
   t.week_completions.push({ enrolment_id: 'e-koffi', week_number: 1, user_id: 'u-koffi', completed_at: daysFrom(-4) });
+  t.coach_notes.push({ id: id(), enrolment_id: 'e-awa', coach_id: COACH.id, occurred_at: daysFrom(-3), exchange_type: 'message', topic: 'Bilan de la semaine 2 (exemple fictif)',
+    needs: '', tools: 'Noter ses inquiétudes le soir', observations: 'A complété les semaines 1 et 2.', actions: 'Essayer le plan de résolution sur un seul problème.',
+    next_step: 'Relire le bilan de la semaine 3.', next_contact_at: daysFrom(4), body: '', archived_at: null, version: 1, created_at: daysFrom(-3), updated_at: daysFrom(-3) });
+  t.staff_tasks.push({ id: id(), owner_id: COACH.id, title: 'Vérifier le paiement de la prochaine demande', due_at: daysFrom(1), enrolment_id: null, request_id: 'r-demo1', done_at: null, created_at: daysFrom(-1) });
   t.resource_suggestions.push({ id: id(), enrolment_id: 'e-awa', coach_id: COACH.id, kind: 'article', ref: 'sommeil-sortir-de-la-bataille-contre-la-nuit', title: 'Sommeil : sortir de la bataille contre la nuit', note: 'Peut vous aider pour les inquiétudes du soir.', adequacy_reviewed: true, created_at: daysFrom(-2) });
   return t;
 }
@@ -103,6 +111,26 @@ export function createLocalBackend() {
   const canQ = (e) => T.feature_flags.questionnaires && e.plan !== 'autonome' && e.questionnaires_enabled && T.programmes.find(p => p.id === e.programme_id)?.questionnaires_enabled;
   const deny = (m = 'Action non autorisée') => { throw new Error(m); };
   const coachOf = (e) => e && e.coach_id === uid;
+  const isAdmin = () => me()?.role === 'admin';
+  const isTeam = () => ['admin', 'coach'].includes(me()?.role);
+  const requireTeam = () => { if (!isTeam()) deny(); };
+  const pcode = (u) => 'LS-' + String(u).replace(/[^a-z0-9]/gi, '').slice(-6).toUpperCase();
+  const prog = (e) => T.programmes.find(p => p.id === e.programme_id);
+  const stepsOf = (pid) => { const ws = T.programme_weeks.filter(w => w.programme_id === pid).map(w => w.id); return T.programme_steps.filter(s => ws.includes(s.week_id)); };
+  const stateOf = (e) => e.status === 'cancelled' ? 'archive' : (e.suspended || T.profiles.find(p => p.id === e.user_id)?.account_status === 'suspended') ? 'suspendu'
+    : (e.status === 'completed' || (e.access_expires_at && e.access_expires_at <= now()) || T.week_completions.filter(c => c.enrolment_id === e.id).length >= 6) ? 'termine'
+    : (e.admission_status !== 'admis' || !['paye', 'offert'].includes(e.payment_status)) ? 'en_attente' : 'actif';
+  const replyDue = (e) => { if (e.plan !== 'ecrit') return null; const ms = T.messages.filter(m => m.enrolment_id === e.id).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    if (!ms.length || ms[0].sender_id !== e.user_id) return null; const h = T.coach_profiles.find(c => c.user_id === e.coach_id)?.response_hours || 48;
+    return new Date(new Date(ms[0].created_at).getTime() + h * 36e5).toISOString(); };
+  const scope = () => T.enrolments.filter(e => isAdmin() || e.coach_id === uid);
+  const mine = () => T.enrolments.filter(e => e.coach_id === uid);
+  const pendingBilans = () => T.shared_summaries.filter(s => { const e = T.enrolments.find(x => x.id === s.enrolment_id); return e && coachOf(e) && e.plan === 'ecrit'
+    && !T.messages.some(m => m.enrolment_id === s.enrolment_id && m.sender_id === uid && m.kind === 'suivi' && m.created_at > s.shared_at); });
+  const within = (t) => { const a = T.coach_profiles.find(c => c.user_id === uid)?.availability; if (!a?.days) return true;
+    const d = new Date(new Date(t).getTime()); const dow = d.getUTCDay() || 7; const hm = d.toISOString().slice(11, 16); const end = new Date(d.getTime() + 15 * 6e4).toISOString().slice(11, 16);
+    return a.days.includes(dow) && hm >= (a.start || '00:00') && end <= (a.end || '23:59'); };
+  const fullName = (u) => { const p = T.profiles.find(x => x.id === u); return { first_name: p?.first_name || '', last_name: p?.last_name || '' }; };
   const done = (x) => { persist(); return x; };
 
   return {
@@ -274,6 +302,133 @@ export function createLocalBackend() {
       log('coach_appointment_' + status, a.enrolment_id, { appointment: aid }); persist();
     },
     async coachReviewQuestionnaire() { deny('Questionnaires désactivés.'); },
+
+    // ---------- Espace accompagnante (v4) ----------
+    async staffDashboard() {
+      requireTeam(); log('staff_dashboard', null); persist();
+      const sc = scope().map(e => ({ ...e, st: stateOf(e) })), act = sc.filter(e => e.st === 'actif'), soon = new Date(Date.now() + 14 * 864e5).toISOString();
+      const byProg = {}; act.forEach(e => { const t = prog(e)?.title; byProg[t] = (byProg[t] || 0) + 1; });
+      return { scope: isAdmin() ? 'all' : 'mine', active: act.length, pending_access: sc.filter(e => e.st === 'en_attente').length,
+        requests_new: isAdmin() ? T.enrolment_requests.filter(r => r.status === 'nouvelle').length : null,
+        requests_to_review: isAdmin() ? T.enrolment_requests.filter(r => ['nouvelle', 'en_cours', 'infos_demandees', 'acceptee'].includes(r.status)).length : null,
+        by_programme: Object.entries(byProg).map(([programme, n]) => ({ programme, n })),
+        by_plan: { autonome: act.filter(e => e.plan === 'autonome').length, ecrit: act.filter(e => e.plan === 'ecrit').length, appels: act.filter(e => e.plan === 'appels').length },
+        p2_pending: mine().filter(replyDue).length, p2_overdue: mine().filter(e => replyDue(e) && replyDue(e) < now()).length,
+        p3_upcoming: T.appointments.filter(a => coachOf(T.enrolments.find(e => e.id === a.enrolment_id)) && ['demande', 'confirme', 'reporte'].includes(a.status) && a.starts_at > now()).length,
+        p3_to_confirm: T.appointments.filter(a => coachOf(T.enrolments.find(e => e.id === a.enrolment_id)) && a.status === 'demande' && a.starts_at > now()).length,
+        bilans_to_prepare: pendingBilans().length,
+        notes_follow_up: T.coach_notes.filter(n => n.coach_id === uid && !n.archived_at && n.next_contact_at && Math.abs(new Date(n.next_contact_at) - Date.now()) < 7 * 864e5).length,
+        ending_soon: act.filter(e => e.access_expires_at && e.access_expires_at > now() && e.access_expires_at < soon).length,
+        tasks_due: T.staff_tasks.filter(t => t.owner_id === uid && !t.done_at && (!t.due_at || t.due_at <= new Date(Date.now() + 864e5).toISOString())).length,
+        open_referrals: T.referrals.filter(r => coachOf(T.enrolments.find(e => e.id === r.enrolment_id)) && r.status === 'ouverte').length,
+        security: { role: me()?.role, aal: 'aal1', mfa_enrolled: false, mfa_required: false, session_ok: true, demo: true } };
+    },
+    async staffParticipants() {
+      requireTeam(); log('staff_list_participants', null); persist();
+      return scope().map(e => { const p = prog(e), all = stepsOf(e.programme_id).map(s => s.id);
+        return { enrolment_id: e.id, user_id: e.user_id, participant_code: pcode(e.user_id), ...fullName(e.user_id), programme_id: e.programme_id, programme: p?.title, plan: e.plan,
+          starts_at: e.access_starts_at || e.created_at, ends_at: e.access_expires_at, current_week: Math.min(6, T.week_completions.filter(c => c.enrolment_id === e.id).length + 1),
+          steps_done: T.step_progress.filter(x => x.enrolment_id === e.id && x.status === 'completed' && all.includes(x.step_id)).length, steps_total: all.length, state: stateOf(e),
+          next_appointment: (coachOf(e) || isAdmin()) ? T.appointments.filter(a => a.enrolment_id === e.id && ['demande', 'confirme', 'reporte'].includes(a.status) && a.starts_at > now()).map(a => a.starts_at).sort()[0] || null : null,
+          coached_by_me: coachOf(e), coach_name: T.coach_profiles.find(c => c.user_id === e.coach_id)?.display_name || null,
+          unread: coachOf(e) ? T.messages.filter(m => m.enrolment_id === e.id && m.sender_id === e.user_id && !m.read_at).length : null, reply_due: coachOf(e) ? replyDue(e) : null }; })
+        .sort((a, b) => a.first_name.localeCompare(b.first_name));
+    },
+    async staffParticipant(eId) {
+      requireTeam(); const e = T.enrolments.find(x => x.id === eId); if (!e || !(isAdmin() || coachOf(e))) deny();
+      log('staff_view_participant', eId);
+      const p = prog(e), pr = T.profiles.find(x => x.id === e.user_id), req = T.enrolment_requests.filter(r => r.enrolment_id === eId || (r.user_id === e.user_id && !r.enrolment_id)).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+      const done = T.step_progress.filter(x => x.enrolment_id === eId && x.status === 'completed').map(x => x.step_id);
+      const res = {
+        info: { enrolment_id: e.id, user_id: e.user_id, participant_code: pcode(e.user_id), first_name: pr?.first_name, last_name: pr?.last_name, email: pr?.email, phone: req?.phone || null,
+          programme: p?.title, programme_id: p?.id, plan: e.plan, state: stateOf(e), status: e.status, payment_status: e.payment_status, admission_status: e.admission_status,
+          suspended: e.suspended, account_status: pr?.account_status, must_set_password: pr?.must_set_password, last_sign_in_at: isAdmin() ? daysFrom(-1) : null,
+          created_at: e.created_at, starts_at: e.access_starts_at || e.created_at, access_starts_at: e.access_starts_at || null, ends_at: e.access_expires_at, coach_id: e.coach_id,
+          coach_name: T.coach_profiles.find(c => c.user_id === e.coach_id)?.display_name || null, questionnaires_enabled: e.questionnaires_enabled,
+          share_summaries: e.share_summaries, share_goals: e.share_goals, coached_by_me: coachOf(e), can_admin: isAdmin() },
+        evaluation: req ? { request_id: req.id, created_at: req.created_at, status: req.status, answers: req.evaluation || {}, message: req.message, review_result: req.review_result || null,
+          decision_note: req.decision_note || null, reviewed_at: req.reviewed_at || null } : null,
+        progress: { weeks_completed: T.week_completions.filter(c => c.enrolment_id === eId).map(c => c.week_number).sort(),
+          weeks: T.programme_weeks.filter(w => w.programme_id === e.programme_id).sort((a, b) => a.week_number - b.week_number).map(w => { const ss = T.programme_steps.filter(s => s.week_id === w.id);
+            return { n: w.week_number, title: w.title, done: ss.filter(s => done.includes(s.id)).length, total: ss.length, exercises_done: ss.filter(s => done.includes(s.id) && ['exercice', 'bilan'].includes(s.kind)).length }; }),
+          last_activity: T.step_progress.filter(x => x.enrolment_id === eId).map(x => x.completed_at || x.started_at).filter(Boolean).sort().slice(-1)[0] || null,
+          goals: e.share_goals ? T.goals.filter(g => g.enrolment_id === eId && g.status !== 'archive').map(g => ({ scope: g.scope, week_number: g.week_number, title: g.title, status: g.status })) : null,
+          ratings: e.share_summaries ? T.self_ratings.filter(r => r.enrolment_id === eId).sort((a, b) => a.week_number - b.week_number).map(r => ({ week: r.week_number, key: r.measure_key, value: r.value })) : null },
+        tasks: T.staff_tasks.filter(t => t.owner_id === uid && t.enrolment_id === eId),
+      };
+      if (coachOf(e)) {
+        res.coach = await this.coachParticipant(eId);
+        res.notes = T.coach_notes.filter(n => n.enrolment_id === eId && n.coach_id === uid).sort((a, b) => (b.occurred_at || b.created_at).localeCompare(a.occurred_at || a.created_at))
+          .map(n => ({ ...n, versions: T.coach_note_versions.filter(v => v.note_id === n.id).length }));
+        res.reply_due = replyDue(e);
+        res.calls = { done: T.appointments.filter(a => a.enrolment_id === eId && a.status === 'effectue').length, planned: T.appointments.filter(a => a.enrolment_id === eId && ['demande', 'confirme', 'reporte'].includes(a.status)).length };
+      }
+      persist(); return res;
+    },
+    async staffAgenda() {
+      requireTeam(); log('staff_view_agenda', null); persist();
+      const who = (eId) => fullName(T.enrolments.find(x => x.id === eId)?.user_id);
+      return {
+        availability: (() => { const c = T.coach_profiles.find(x => x.user_id === uid); return c ? { availability: c.availability || {}, hours: c.hours, response_hours: c.response_hours || 48, response_delay: c.response_delay } : null; })(),
+        calls: T.appointments.filter(a => coachOf(T.enrolments.find(e => e.id === a.enrolment_id)) && a.starts_at > new Date(Date.now() - 7 * 864e5).toISOString())
+          .sort((a, b) => a.starts_at.localeCompare(b.starts_at)).map(a => ({ ...a, ...who(a.enrolment_id) })),
+        p2_messages: mine().filter(replyDue).map(e => ({ enrolment_id: e.id, ...who(e.id), due_at: replyDue(e) })).sort((a, b) => a.due_at.localeCompare(b.due_at)),
+        p2_bilans: pendingBilans().map(s => ({ enrolment_id: s.enrolment_id, ...who(s.enrolment_id), week_number: s.week_number, shared_at: s.shared_at })),
+        follow_ups: T.coach_notes.filter(n => n.coach_id === uid && !n.archived_at && n.next_contact_at && n.next_contact_at > new Date(Date.now() - 14 * 864e5).toISOString())
+          .map(n => ({ enrolment_id: n.enrolment_id, ...who(n.enrolment_id), next_contact_at: n.next_contact_at, next_step: n.next_step })).sort((a, b) => a.next_contact_at.localeCompare(b.next_contact_at)),
+        requests: isAdmin() ? T.enrolment_requests.filter(r => ['nouvelle', 'en_cours', 'infos_demandees', 'acceptee'].includes(r.status)) : null,
+        ending_soon: scope().filter(e => stateOf(e) === 'actif' && e.access_expires_at && e.access_expires_at < new Date(Date.now() + 21 * 864e5).toISOString())
+          .map(e => ({ enrolment_id: e.id, ...who(e.id), ends_at: e.access_expires_at })),
+        admin_follow_ups: isAdmin() ? scope().filter(e => stateOf(e) === 'en_attente').map(e => ({ enrolment_id: e.id, ...who(e.id), reason: !['paye', 'offert'].includes(e.payment_status) ? 'paiement' : 'admission' })) : null,
+        tasks: T.staff_tasks.filter(t => t.owner_id === uid && (!t.done_at || t.done_at > new Date(Date.now() - 14 * 864e5).toISOString())).map(t => ({ ...t, ...(t.enrolment_id ? who(t.enrolment_id) : {}) })),
+      };
+    },
+    async exportNotes(eId, reason) {
+      const e = T.enrolments.find(x => x.id === eId); if (!(coachOf(e) || (isAdmin() && (reason || '').length >= 10))) deny('Export non autorisé (motif d’au moins 10 caractères requis pour l’administration).');
+      log('staff_export_notes', eId, { reason }); persist();
+      return { exported_at: now(), reason, notes: T.coach_notes.filter(n => n.enrolment_id === eId).map(n => ({ ...n, versions: T.coach_note_versions.filter(v => v.note_id === n.id) })) };
+    },
+    async scheduleAppointment(eId, n, startsAt, mode) {
+      const e = T.enrolments.find(x => x.id === eId); if (!coachOf(e)) deny(); if (e.plan !== 'appels') deny('Les rendez-vous concernent uniquement le forfait 3.');
+      if (startsAt <= now()) deny('Choisissez une date à venir.'); if (!within(startsAt)) deny('Ce créneau est en dehors de vos disponibilités.');
+      let a = T.appointments.find(x => x.enrolment_id === eId && x.session_number === n);
+      if (a && ['effectue', 'manque'].includes(a.status)) deny('Cet échange a déjà eu lieu.');
+      const st = a && ['confirme', 'reporte'].includes(a.status) && a.starts_at !== startsAt ? 'reporte' : 'confirme';
+      if (!a) { a = { id: id(), enrolment_id: eId, session_number: n, duration_minutes: 15, participant_note: '', created_at: now() }; T.appointments.push(a); }
+      Object.assign(a, { starts_at: startsAt, mode, status: st, confirmed_at: now(), reminder_at: new Date(new Date(startsAt) - 864e5).toISOString() });
+      log('coach_appointment_' + st, eId, { appointment: a.id, session: n }); persist(); return a.id;
+    },
+    async setAvailability(av, hrs, hoursText, delayText) {
+      requireTeam(); let c = T.coach_profiles.find(x => x.user_id === uid);
+      if (!c) { c = { user_id: uid, display_name: me()?.first_name || 'Accompagnante', public_title: 'Accompagnante en bien-être psychologique', bio: '', verified: false, limits: '', active: true }; T.coach_profiles.push(c); }
+      Object.assign(c, { availability: av || {}, response_hours: hrs, hours: hoursText || '', response_delay: delayText || '' }); log('coach_set_availability', null); persist();
+    },
+    async noteSave(eId, n) {
+      const e = T.enrolments.find(x => x.id === eId); if (!coachOf(e)) deny();
+      const fields = { occurred_at: n.occurred_at || now(), exchange_type: n.exchange_type, topic: n.topic, needs: n.needs, tools: n.tools, observations: n.observations, actions: n.actions, next_step: n.next_step, next_contact_at: n.next_contact_at || null };
+      if (n.id) { const old = T.coach_notes.find(x => x.id === n.id && x.coach_id === uid); if (!old) deny();
+        const { id: _i, enrolment_id: _e, coach_id: _c, ...snap } = old; T.coach_note_versions.push({ id: id(), note_id: old.id, version: old.version || 1, snapshot: snap, edited_by: uid, edited_at: now() });
+        Object.assign(old, fields, { version: (old.version || 1) + 1, updated_at: now() }); log('coach_notes_update', eId, { id: old.id }); }
+      else { const x = { id: id(), enrolment_id: eId, coach_id: uid, body: '', ...fields, archived_at: null, version: 1, created_at: now(), updated_at: now() }; T.coach_notes.push(x); log('coach_notes_insert', eId, { id: x.id }); }
+      persist();
+    },
+    async noteArchive(nid, archived) { const n = T.coach_notes.find(x => x.id === nid && x.coach_id === uid); if (!n) deny();
+      const { id: _i, enrolment_id: _e, coach_id: _c, ...snap } = n; T.coach_note_versions.push({ id: id(), note_id: n.id, version: n.version || 1, snapshot: snap, edited_by: uid, edited_at: now() });
+      n.archived_at = archived ? now() : null; n.version = (n.version || 1) + 1; log('coach_notes_update', n.enrolment_id, { id: nid }); persist(); },
+    async noteVersions(nid) { const n = T.coach_notes.find(x => x.id === nid && x.coach_id === uid); if (!n) return []; return T.coach_note_versions.filter(v => v.note_id === nid).sort((a, b) => b.version - a.version); },
+    async taskSave(t) { requireTeam();
+      if (t.enrolment_id && !(isAdmin() || coachOf(T.enrolments.find(e => e.id === t.enrolment_id)))) deny();
+      if (t.id) Object.assign(T.staff_tasks.find(x => x.id === t.id && x.owner_id === uid), { title: t.title, due_at: t.due_at || null });
+      else T.staff_tasks.push({ id: id(), owner_id: uid, title: t.title, due_at: t.due_at || null, enrolment_id: t.enrolment_id || null, request_id: t.request_id || null, done_at: null, created_at: now() });
+      persist(); },
+    async taskDone(tid, done) { const t = T.staff_tasks.find(x => x.id === tid && x.owner_id === uid); if (t) { t.done_at = done ? now() : null; persist(); } },
+    async security() { return { role: me()?.role, aal: 'aal1', mfa_enrolled: false, mfa_required: false, session_ok: true, demo: true }; },
+    async aal() { return { currentLevel: 'aal1', nextLevel: 'aal1' }; },
+    async mfaFactors() { return []; },
+    async mfaEnroll() { deny('Dans la maquette, la double authentification n’est pas simulée : elle fonctionne sur le site relié à Supabase.'); },
+    async mfaVerify() { deny('Non disponible dans la maquette.'); },
+    async mfaUnenroll() { deny('Non disponible dans la maquette.'); },
+    async requireMfa() { deny('Non disponible dans la maquette.'); },
 
     // ---------- Administration ----------
     async overview() {

@@ -3,7 +3,7 @@ import { $, toast } from "./ui/util.js";
 import { ui, actions, forms, inputs, changes, hooks } from "./ui/state.js";
 import * as P from "./ui/public.js";
 import * as M from "./ui/member.js";
-import * as K from "./ui/coach.js";
+import * as ST from "./ui/staff.js";
 import * as AD from "./ui/admin.js";
 import * as L from "./ui/library.js";
 import * as PG from "./ui/programmes.js";
@@ -27,7 +27,8 @@ window.addEventListener("hashchange", () => { if (/access_token=|error_descripti
 
 const MEMBER = { espace: M.mDash, demarrer: M.mOnboarding, lecons: M.mLessons, exercices: M.mExercises, journal: M.mJournal, objectifs: M.mGoals,
   evolution: M.mProgress, plan: M.mPlan, outils: M.mTools, coach: M.mCoach, compte: M.mAccount };
-const COACH = { accompagnante: K.cDash, "accompagnante-participants": K.cParticipants, "accompagnante-messages": K.cMessages, "accompagnante-agenda": K.cAgenda };
+const STAFF = { accompagnante: ST.sDash, "accompagnante-participants": ST.sParticipants, "accompagnante-messages": ST.sMessages,
+  "accompagnante-agenda": ST.sAgenda, "accompagnante-taches": ST.sTasks, "accompagnante-parametres": ST.sSettings };
 
 function page(r){
   let m;
@@ -46,11 +47,20 @@ function page(r){
   if (r === "premier-acces" || r === "nouveau-mot-de-passe") return P.pFirstAccess();
   if (r === "connexion") return S.user ? redirect(P.homeRoute()) : P.pLogin();
 
-  // Espace accompagnante
+  // Double authentification à valider avant tout espace privé de l'équipe
+  if (r === "verification") return S.user && store.needsMfa() ? ST.sVerify() : redirect(S.user ? P.homeRoute() : "connexion");
+  const privateStaff = r.startsWith("accompagnante") || r.startsWith("admin") || r.startsWith("apercu");
+  if (privateStaff && S.user && store.needsMfa()) return redirect("verification");
+  // Espace accompagnante (rôles vérifiés ici pour l'affichage ; les données sont protégées côté serveur)
   if (r.startsWith("accompagnante")) {
-    if (!store.isCoach()) return S.user ? redirect(P.homeRoute()) : redirect("connexion");
-    if ((m = r.match(/^accompagnante-p-(.+)$/))) return K.cParticipant(m[1]);
-    return (COACH[r] || K.cDash)();
+    if (!S.user) return redirect("connexion");
+    const team = store.isTeam(), staff = store.isStaff();
+    if (r === "accompagnante-parametres") return ST.sSettings();
+    if (r === "accompagnante-programmes") { if (!staff) return redirect(P.homeRoute()); ui.adminTab = "programmes"; return AD.aMain(); }
+    if (!team) return redirect(P.homeRoute());
+    if (r === "accompagnante-demandes") return S.user.role === "admin" ? ST.sRequests() : redirect("accompagnante");
+    if ((m = r.match(/^accompagnante-p-(.+)$/))) { ui.params = [m[1]]; return ST.sParticipant(m[1]); }
+    return (STAFF[r] || ST.sDash)();
   }
   // Administration
   if (r.startsWith("admin") || r.startsWith("apercu")) {
@@ -59,13 +69,14 @@ function page(r){
     if ((m = r.match(/^admin-programme-(.+)$/))) return AD.aProgramme(m[1]);
     if ((m = r.match(/^admin-semaine-(.+)-(\d+)$/))) { ui.params = [m[1], +m[2]]; return AD.aWeek(m[1], +m[2]); }
     if ((m = r.match(/^admin-etape-(.+)-(\d+)-(?:new-(\w+)|(\d+))$/))) { ui.params = [m[1], +m[2]]; return AD.aStep(m[1], +m[2], m[3] ? "new" : m[4], m[3]); }
+    if (["demandes", "participants", "programmes"].includes(ui.adminTab) && r === "admin") ui.adminTab = "vue";
     return AD.aMain();
   }
   // Espace participant
   if (MEMBER[r] || r.startsWith("semaine-")) {
     if (!S.user) return redirect("connexion");
-    if (store.isCoach()) return redirect("accompagnante");
-    if (store.isStaff() && !S.enrolment) return redirect("admin");
+    if (store.isTeam()) return redirect("accompagnante");
+    if (store.isStaff() && !S.enrolment) return redirect(P.homeRoute());
     if ((m = r.match(/^semaine-(\d+)-(\d+)$/))) { ui.route = "semaine"; ui.params = [+m[1], +m[2]]; return M.mPlayer(+m[1], +m[2]); }
     return MEMBER[r]();
   }
@@ -73,7 +84,7 @@ function page(r){
 }
 function redirect(r){ current = r; try { history.replaceState(null, "", "#" + r); } catch(e) {} ui.route = r; return page(r); }
 
-const PRIVATE = /^(programme|programmes|connexion|premier-acces|espace|lecons|semaine|exercices|journal|objectifs|evolution|plan|outils|coach|compte|demarrer|admin|apercu|accompagnante)/;
+const PRIVATE = /^(programme|programmes|connexion|premier-acces|verification|espace|lecons|semaine|exercices|journal|objectifs|evolution|plan|outils|coach|compte|demarrer|admin|apercu|accompagnante)/;
 function render(navigated = false){
   stopBreath();
   // Premier accès : le participant doit choisir son mot de passe avant toute autre page privée.
@@ -117,7 +128,7 @@ document.addEventListener("change", (e) => { for (const h of changes) if (h(e.ta
 /* ---------- Démarrage ---------- */
 store.onEvent((evt) => {
   if (evt === "recovery") { go("nouveau-mot-de-passe"); return; }
-  K.resetCoachCache();
+  ST.dropStaff();
   render(false);
 });
 $("#app").innerHTML = `<div class="boot"><p class="muted">Chargement…</p></div>`;

@@ -5,12 +5,13 @@ import { ui, actions, forms, changes, rerender, go } from "./state.js";
 import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
 import { CATEGORIES } from "./library.js";
+import { EVALUATION_QUESTIONS } from "../content.js";
 
 const A = ui.admin;
 const PLAN = { autonome: "Formule 1 · Autonome", ecrit: "Formule 2 · Écrit", appels: "Formule 3 · Appels" };
 const PAY = { non_paye: "Non payé", en_attente: "Paiement en attente", paye: "Payé", offert: "Offert" };
 const ADM = { en_attente: "Admission en attente", admis: "Admis", refuse: "Refusé" };
-const REQ = { nouvelle: "Nouvelle", en_cours: "En cours", acceptee: "Acceptée", refusee: "Refusée" };
+const REQ = { nouvelle: "Nouvelle demande", en_cours: "En cours d’examen", infos_demandees: "Informations complémentaires demandées", acceptee: "Acceptée", orientation: "Orientation proposée", refusee: "Non retenue", compte_cree: "Compte créé" };
 const ETAT = { brouillon: "Brouillon", a_relire: "À relire", publie: "Publié" };
 const loading = `<p class="muted">Chargement…</p>`;
 const H = (t, extra = "", lede = "") => `<div class="section-head" style="margin:0"><div class="stack" style="gap:6px"><span class="eyebrow">Administration</span><h1 class="h-page">${t}</h1>${lede ? `<p class="muted">${lede}</p>` : ""}</div>${extra}</div>`;
@@ -25,41 +26,51 @@ const d10 = (d) => d ? new Date(d).toISOString().slice(0, 10) : "";
 const fromDate = (v, end) => v ? new Date(v + (end ? "T23:59:59" : "T00:00:00")).toISOString() : null;
 const err = (e) => toast(e?.message || "Action impossible.");
 
-/* ---------- Demandes d'inscription ---------- */
-export function aRequests(shell) {
+/* ---------- Demandes et évaluations initiales ---------- */
+let afterChange = () => {};
+export const setAfterChange = (fn) => { afterChange = fn; };
+const REQ_ACTIONS = [["en_cours", "Passer en examen"], ["infos_demandees", "Demander des précisions"], ["acceptee", "Accepter"], ["orientation", "Proposer une orientation"], ["refusee", "Ne pas retenir"]];
+const EVAL_LABEL = Object.fromEntries(EVALUATION_QUESTIONS.map(q => [q.k, q.label]));
+export function requestsPanel(shell) {
   need("requests", () => api.requests());
   const list = A.requests || [];
   const f = ui.reqFilter || "ouvertes";
-  const rows = list.filter(r => f === "toutes" || (f === "ouvertes" ? ["nouvelle", "en_cours"].includes(r.status) : r.status === f));
+  const OPEN = ["nouvelle", "en_cours", "infos_demandees", "acceptee"];
+  const rows = list.filter(r => f === "toutes" || (f === "ouvertes" ? OPEN.includes(r.status) : r.status === f));
   const prog = (slug) => C.programmes.find(p => p.slug === slug)?.title || slug;
-  return shell(`${H("Demandes d’inscription", "", "Une demande ne crée pas de compte. Après vérification de la demande, de l’adéquation du programme et du paiement, créez le participant.")}
-   <div class="chips">${[["ouvertes", "À traiter"], ["acceptee", "Acceptées"], ["refusee", "Refusées"], ["toutes", "Toutes"]].map(([k, l]) => `<button class="chip" data-act="req-filter" data-v="${k}" aria-pressed="${f === k}">${l}</button>`).join("")}</div>
-   <div class="stack">${A.requests ? rows.map(r => `<article class="card stack req" style="gap:10px">
-     <div class="row" style="justify-content:space-between"><b>${esc(r.first_name)} ${esc(r.last_name)}</b><span class="badge ${r.status === "acceptee" ? "ok" : r.status === "refusee" ? "mute" : "warn"}">${REQ[r.status]}</span></div>
+  return shell(`${H("Demandes et évaluations initiales", "", "Une demande ne crée aucun compte. Examinez les besoins et l’adéquation (ce n’est pas un diagnostic), puis validez, demandez des précisions ou orientez la personne. Après validation et paiement, créez le compte.")}
+   <div class="chips">${[["ouvertes", "À traiter"], ["infos_demandees", "Précisions demandées"], ["orientation", "Orientations"], ["refusee", "Non retenues"], ["compte_cree", "Comptes créés"], ["toutes", "Toutes"]]
+     .map(([k, l]) => `<button class="chip" data-act="req-filter" data-v="${k}" aria-pressed="${f === k}">${l} <span class="chip-n">${k === "toutes" ? list.length : k === "ouvertes" ? list.filter(r => OPEN.includes(r.status)).length : list.filter(r => r.status === k).length}</span></button>`).join("")}</div>
+   <div class="stack">${A.requests ? rows.map(r => { const ev = Object.entries(r.evaluation || {}).filter(([, v]) => v);
+     return `<article class="card stack req-card" style="gap:10px" id="req-${r.id}">
+     <div class="row" style="justify-content:space-between"><b>${esc(r.first_name)} ${esc(r.last_name)}</b><span class="badge ${["acceptee", "compte_cree"].includes(r.status) ? "ok" : ["refusee"].includes(r.status) ? "mute" : "warn"}">${REQ[r.status] || r.status}</span></div>
      <p class="small">${esc(prog(r.programme_slug))} · ${PLAN[r.plan] || r.plan}</p>
      <p class="small muted">${esc(r.email)}${r.phone ? " · " + esc(r.phone) : ""} · reçue le ${fmtDate(r.created_at)}</p>
-     ${r.message ? `<p class="small entry-body">« ${esc(r.message)} »</p>` : ""}
+     <details ${OPEN.includes(r.status) ? "open" : ""}><summary class="flabel">Mon évaluation initiale${ev.length ? "" : " (non remplie)"}</summary>
+      ${ev.length ? `<dl class="facts facts-wide">${ev.map(([k, v]) => `<div><dt>${esc(EVAL_LABEL[k] || k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}
+      ${r.message ? `<p class="small entry-body">« ${esc(r.message)} »</p>` : ""}</details>
+     ${r.status === "compte_cree" ? `<p class="small">${icon("check")} Compte créé${r.enrolment_id ? ` · <button class="linkbtn" data-go="accompagnante-p-${r.enrolment_id}">Ouvrir le dossier</button>` : ""}</p>` : `
+     <div class="grid g2" style="gap:10px">
+      <div class="field"><label class="flabel" for="rr-${r.id}">Résultat de l’examen administratif</label><textarea id="rr-${r.id}" rows="2" maxlength="5000">${esc(r.review_result || "")}</textarea></div>
+      <div class="field"><label class="flabel" for="rd-${r.id}">Décision d’admission ou d’orientation</label><textarea id="rd-${r.id}" rows="2" maxlength="5000" placeholder="Par exemple : programme adapté ; orientation vers une structure de santé…">${esc(r.decision_note || "")}</textarea></div></div>
      <div class="field"><label class="flabel" for="rn-${r.id}">Note interne</label><input id="rn-${r.id}" type="text" value="${esc(r.admin_note || "")}" maxlength="500"></div>
-     <div class="row">${["nouvelle", "en_cours"].includes(r.status) ? `<button class="btn btn-primary btn-sm" data-act="req-create" data-id="${r.id}">${icon("user")}Créer le participant</button>
-       <button class="btn btn-soft btn-sm" data-act="req-status" data-id="${r.id}" data-s="en_cours">Marquer en cours</button><button class="btn btn-soft btn-sm" data-act="req-status" data-id="${r.id}" data-s="refusee">Refuser</button>` : ""}
-      <button class="btn btn-soft btn-sm" data-act="req-note" data-id="${r.id}">Enregistrer la note</button></div></article>`).join("") || `<p class="muted">Aucune demande.</p>` : loading}</div>`, "demandes");
+     <div class="row">${REQ_ACTIONS.filter(([k]) => k !== r.status).map(([k, l]) => `<button class="btn btn-soft btn-sm" data-act="req-status" data-id="${r.id}" data-s="${k}">${l}</button>`).join("")}
+      <button class="btn btn-soft btn-sm" data-act="req-note" data-id="${r.id}">Enregistrer</button>
+      ${["acceptee", "en_cours"].includes(r.status) ? `<button class="btn btn-primary btn-sm" data-act="req-create" data-id="${r.id}">${icon("user")}Créer le compte</button>` : ""}</div>`}</article>`; }).join("") || `<p class="muted">Aucune demande.</p>` : loading}</div>`, "demandes");
 }
+const reqPatch = (id) => ({ review_result: $("#rr-" + id)?.value.trim() || null, decision_note: $("#rd-" + id)?.value.trim() || null, admin_note: $("#rn-" + id)?.value.trim() || null });
 actions["req-filter"] = (b) => { ui.reqFilter = b.dataset.v; rerender(); };
-actions["req-status"] = async (b) => { try { await api.updateRequest(b.dataset.id, { status: b.dataset.s, admin_note: $("#rn-" + b.dataset.id)?.value || null }); drop("requests"); toast("Demande mise à jour"); rerender(); } catch (e) { err(e); } };
-actions["req-note"] = async (b) => { try { await api.updateRequest(b.dataset.id, { admin_note: $("#rn-" + b.dataset.id).value || null }); drop("requests"); toast("Note enregistrée"); rerender(); } catch (e) { err(e); } };
-actions["req-create"] = (b) => { const r = (A.requests || []).find(x => x.id === b.dataset.id); ui.newParticipant = { ...r, fromRequest: r.id }; ui.adminTab = "participants"; go("admin"); };
+actions["req-status"] = async (b) => { try { await api.updateRequest(b.dataset.id, { ...reqPatch(b.dataset.id), status: b.dataset.s, reviewed_at: new Date().toISOString() }); drop("requests"); afterChange(); toast("Demande : " + (REQ[b.dataset.s] || b.dataset.s)); rerender(); } catch (e) { err(e); } };
+actions["req-note"] = async (b) => { try { await api.updateRequest(b.dataset.id, reqPatch(b.dataset.id)); drop("requests"); toast("Enregistré"); rerender(); } catch (e) { err(e); } };
+actions["req-create"] = (b) => { const r = (A.requests || []).find(x => x.id === b.dataset.id); ui.newParticipant = { ...r, fromRequest: r.id }; afterChange({ open: ui.newParticipant }); };
+export function aRequests(shell) { return requestsPanel(shell); }
 
 /* ---------- Participants ---------- */
-export function aParticipants(shell) {
-  need("participants", () => api.participants()); need("team", () => api.team());
-  const coaches = (A.team || []).filter(t => t.role === "coach");
-  const progs = C.programmes;
-  const np = ui.newParticipant;
-  const q = (ui.partQuery || "").toLowerCase();
-  const rows = (A.participants || []).filter(r => !q || `${r.first_name} ${r.last_name} ${r.email}`.toLowerCase().includes(q));
-  const users = [...new Map(rows.map(r => [r.user_id, r])).values()];
-  const sel = ui.partSel;
-  const form = np ? `<form class="card stack" id="np-form" novalidate><h2 class="h-sub" style="margin:0">Nouveau participant</h2>
+const teamCoaches = () => (A.team || []).filter(t => ["coach", "admin"].includes(t.role));
+export function newParticipantForm(np) {
+  need("team", () => api.team());
+  const coaches = teamCoaches(), progs = C.programmes;
+  return `<form class="card stack" id="np-form" novalidate><h2 class="h-sub" style="margin:0">Nouveau participant</h2>
     ${np.fromRequest ? `<p class="small muted">Prérempli depuis la demande de ${esc(np.first_name)} ${esc(np.last_name)}.</p>` : ""}
     <div class="grid g3" style="gap:12px">
      <div class="field"><label class="flabel" for="np-first">Prénom *</label><input id="np-first" type="text" value="${esc(np.first_name || "")}" required></div>
@@ -68,7 +79,7 @@ export function aParticipants(shell) {
     <div class="grid g3" style="gap:12px">
      <div class="field"><label class="flabel" for="np-prog">Programme attribué *</label><select id="np-prog">${progs.map(p => `<option value="${p.uuid}" ${np.programme_slug === p.slug ? "selected" : ""}>${esc(p.title)}</option>`).join("")}</select></div>
      <div class="field"><label class="flabel" for="np-plan">Formule *</label><select id="np-plan">${Object.entries(PLAN).map(([k, l]) => `<option value="${k}" ${np.plan === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
-     <div class="field"><label class="flabel" for="np-coach">Accompagnante (formules 2 et 3)</label><select id="np-coach"><option value="">—</option>${coaches.map(c => `<option value="${c.id}">${esc(c.first_name)}</option>`).join("")}</select></div></div>
+     <div class="field"><label class="flabel" for="np-coach">Accompagnante (formules 2 et 3)</label><select id="np-coach"><option value="">—</option>${coaches.map(c => `<option value="${c.id}">${esc(c.first_name)}${c.role === "admin" ? " (administratrice)" : ""}</option>`).join("")}</select></div></div>
     <div class="grid g3" style="gap:12px">
      <div class="field"><label class="flabel" for="np-pay">État du paiement *</label><select id="np-pay">${Object.entries(PAY).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select><span class="hint">Les leçons ne s’ouvrent que si le paiement est « Payé » ou « Offert » et l’admission « Admis ».</span></div>
      <div class="field"><label class="flabel" for="np-adm">Admission *</label><select id="np-adm">${Object.entries(ADM).map(([k, l]) => `<option value="${k}" ${k === "admis" ? "selected" : ""}>${l}</option>`).join("")}</select></div>
@@ -79,7 +90,23 @@ export function aParticipants(shell) {
     <div class="field"><label class="flabel" for="np-note">Note administrative protégée (facultatif)</label><textarea id="np-note" rows="2" maxlength="5000"></textarea><span class="hint">Visible par l’administration uniquement. Aucune information clinique.</span></div>
     <label class="check"><input type="checkbox" id="np-consent"><span>Le consentement du participant au traitement de ses données et aux conditions du service a été recueilli. *</span></label>
     <label class="check"><input type="checkbox" id="np-send" checked><span>Envoyer maintenant l’e-mail d’accès (lien à usage unique pour choisir son mot de passe). Décochez pour créer le compte sans l’activer.</span></label>
-    <div class="row"><button class="btn btn-primary" type="submit">Créer le participant</button><button type="button" class="btn btn-soft" data-act="np-cancel">Annuler</button></div><p id="np-out" class="small" role="status"></p></form>` : "";
+    <div class="row"><button class="btn btn-primary" type="submit">Créer le participant</button><button type="button" class="btn btn-soft" data-act="np-cancel">Annuler</button></div><p id="np-out" class="small" role="status"></p></form>`;
+}
+export function adminEnrolmentPanel(userId) {
+  need("participants", () => api.participants()); need("team", () => api.team());
+  if (!A.participants) return loading;
+  return participantDetail(userId, teamCoaches(), true);
+}
+export function aParticipants(shell) {
+  need("participants", () => api.participants()); need("team", () => api.team());
+  const coaches = teamCoaches();
+  const progs = C.programmes;
+  const np = ui.newParticipant;
+  const q = (ui.partQuery || "").toLowerCase();
+  const rows = (A.participants || []).filter(r => !q || `${r.first_name} ${r.last_name} ${r.email}`.toLowerCase().includes(q));
+  const users = [...new Map(rows.map(r => [r.user_id, r])).values()];
+  const sel = ui.partSel;
+  const form = np ? newParticipantForm(np) : "";
   const detail = sel ? participantDetail(sel, coaches) : "";
   return shell(`${H("Participants", np ? "" : `<button class="btn btn-primary" data-act="np-open">${icon("plus")}Nouveau participant</button>`, "Seule l’administration crée les comptes. Aucune inscription publique n’est possible.")}
    ${DEMO ? `<div class="notice">${icon("info")}<span>Maquette : aucun e-mail n’est réellement envoyé.</span></div>` : ""}
@@ -96,7 +123,7 @@ export function aParticipants(shell) {
 }
 changes.push(t => { if (t.id !== "part-q") return false; ui.partQuery = t.value; rerender(); return true; });
 actions["np-open"] = () => { ui.newParticipant = {}; ui.partSel = null; rerender(); };
-actions["np-cancel"] = () => { ui.newParticipant = null; rerender(); };
+actions["np-cancel"] = () => { ui.newParticipant = null; afterChange({ cancel: true }); rerender(); };
 actions["part-open"] = (b) => { ui.partSel = b.dataset.id; ui.newParticipant = null; drop("notes_" + b.dataset.id); rerender(); window.scrollTo({ top: 0, behavior: "smooth" }); };
 actions["part-close"] = () => { ui.partSel = null; rerender(); };
 forms["np-form"] = async (f) => {
@@ -113,13 +140,14 @@ forms["np-form"] = async (f) => {
   try {
     const r = await api.createParticipant(d);
     const from = ui.newParticipant?.fromRequest;
-    if (from) await api.updateRequest(from, { status: "acceptee" });
+    if (from) await api.updateRequest(from, { status: "compte_cree", user_id: r.user_id, enrolment_id: r.enrolment_id || null });
     ui.newParticipant = null; drop("participants", "requests"); ui.partSel = r.user_id;
-    toast(r.invited ? "Participant créé. L’e-mail d’accès a été envoyé." : "Participant créé, accès non encore envoyé."); rerender();
+    toast(r.invited ? "Participant créé. L’e-mail d’accès a été envoyé." : "Participant créé, accès non encore envoyé.");
+    afterChange({ created: r });
   } catch (e) { out(e.message || "Création impossible."); btn.disabled = false; }
 };
 
-function participantDetail(userId, coaches) {
+function participantDetail(userId, coaches, embedded = false) {
   const rows = (A.participants || []).filter(r => r.user_id === userId);
   if (!rows.length) return "";
   const p = rows[0];
@@ -129,7 +157,7 @@ function participantDetail(userId, coaches) {
   const other = C.programmes.filter(x => !owned.has(x.uuid));
   return `<section class="card stack part-detail" aria-labelledby="pd-h">
    <div class="row" style="justify-content:space-between"><div><h2 class="h-sub" id="pd-h" style="margin:0">${esc(p.first_name)} ${esc(p.last_name)}</h2><p class="small muted">${esc(p.email || "")} · ${p.last_sign_in_at ? "dernière connexion le " + fmtDate(p.last_sign_in_at) : "jamais connecté"}</p></div>
-    <button class="linkbtn small" data-act="part-close">Fermer</button></div>
+    ${embedded ? "" : `<button class="linkbtn small" data-act="part-close">Fermer</button>`}</div>
    <div class="row">
     <button class="btn btn-soft btn-sm" data-act="part-access" data-id="${userId}" ${p.account_status === "suspended" ? "disabled" : ""}>${icon("send")}${p.must_set_password ? "Envoyer l’accès" : "Renvoyer un lien d’accès"}</button>
     ${p.account_status === "suspended" ? `<button class="btn btn-soft btn-sm" data-act="part-status" data-id="${userId}" data-s="active">Réactiver le compte</button>` : `<button class="btn btn-soft btn-sm" data-act="part-status" data-id="${userId}" data-s="suspended">Suspendre le compte</button>`}
@@ -156,7 +184,7 @@ function participantDetail(userId, coaches) {
     ${notes.map(n => `<p class="small"><span class="muted">${fmtDate(n.created_at)} ·</span> ${esc(n.body)}</p>`).join("")}</div>
   </section>`;
 }
-forms["add-enr"] = async (f) => { try { await api.addEnrolment(f.dataset.uid, { programme_id: $("#ae-prog").value, plan: $("#ae-plan").value, payment_status: $("#ae-pay").value, admission_status: "en_attente" }); drop("participants"); toast("Programme attribué (admission en attente)"); rerender(); } catch (e) { err(e); } };
+forms["add-enr"] = async (f) => { try { await api.addEnrolment(f.dataset.uid, { programme_id: $("#ae-prog").value, plan: $("#ae-plan").value, payment_status: $("#ae-pay").value, admission_status: "en_attente" }); drop("participants"); afterChange(); toast("Programme attribué (admission en attente)"); rerender(); } catch (e) { err(e); } };
 forms["note-form"] = async (f) => { const b = $("#an-body").value.trim(); if (!b) return; try { await api.addAdminNote(f.dataset.uid, b); drop("notes_" + f.dataset.uid); rerender(); } catch (e) { err(e); } };
 forms["enr-form-any"] = null;
 document.addEventListener("submit", async (e) => {
@@ -168,12 +196,12 @@ document.addEventListener("submit", async (e) => {
   try {
     await api.saveEnrolment({ enrolment_id: id, plan, coach_id: g("coach").value || null, questionnaires_enabled: g("q").checked, status: "active",
       payment_status: g("pay").value, admission_status: g("adm").value, access_starts_at: fromDate(g("start").value), access_expires_at: fromDate(g("end").value, true), suspended: g("susp").checked });
-    drop("participants"); toast("Inscription mise à jour"); rerender();
+    drop("participants"); afterChange(); toast("Inscription mise à jour"); rerender();
   } catch (e2) { err(e2); }
 });
 actions["enr-extend"] = (b) => { const el = $(`#e-end-${b.dataset.eid}`); const base = el.value ? new Date(el.value) : new Date(); base.setDate(base.getDate() + 28); el.value = d10(base); toast("Nouvelle date proposée : pensez à enregistrer"); };
-actions["part-access"] = async (b) => { try { const r = await api.sendAccess(b.dataset.id); drop("participants"); toast(r?.method === "recovery" ? "Lien de réinitialisation envoyé" : "E-mail d’accès envoyé"); rerender(); } catch (e) { err(e); } };
-actions["part-status"] = async (b) => { try { await api.setAccountStatus(b.dataset.id, b.dataset.s); drop("participants"); toast(b.dataset.s === "suspended" ? "Compte suspendu" : "Compte réactivé"); rerender(); } catch (e) { err(e); } };
+actions["part-access"] = async (b) => { try { const r = await api.sendAccess(b.dataset.id); drop("participants"); afterChange(); toast(r?.method === "recovery" ? "Lien de réinitialisation envoyé" : "E-mail d’accès envoyé"); rerender(); } catch (e) { err(e); } };
+actions["part-status"] = async (b) => { try { await api.setAccountStatus(b.dataset.id, b.dataset.s); drop("participants"); afterChange(); toast(b.dataset.s === "suspended" ? "Compte suspendu" : "Compte réactivé"); rerender(); } catch (e) { err(e); } };
 
 /* ---------- Bibliothèque (CMS éditorial) ---------- */
 const sectionsToText = (secs) => (secs || []).map(s => `## ${s.h}\n\n${(s.p || []).join("\n\n")}`).join("\n\n");

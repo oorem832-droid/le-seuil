@@ -91,3 +91,17 @@ export const CALM_TOOLS = [
   ensuite:"La relaxation ne doit pas devenir une condition obligatoire pour affronter une incertitude. Vous pouvez aussi choisir de laisser l’inconfort présent tout en continuant une action raisonnable."}
 ];
 export const CALM_NOTE = "Ces outils ne remplacent ni la résolution de problème ni une aide professionnelle si nécessaire.";
+
+/* « Mon évaluation initiale » : évaluation des besoins et de l'adéquation, jamais un diagnostic.
+   Aucune question sur le risque suicidaire : sans capacité de réponse en temps réel, ces informations ne doivent pas être collectées ici.
+   Formulations à faire valider par LE SEUIL avant la mise en ligne. */
+export const EVALUATION_QUESTIONS = [
+ {k:"motif", label:"Qu’est-ce qui vous amène à LE SEUIL aujourd’hui ?", type:"textarea", required:true, hint:"Quelques phrases suffisent. Inutile de donner des détails médicaux."},
+ {k:"duree", label:"Depuis combien de temps cette difficulté est-elle présente ?", type:"choice", options:["Moins d’un mois","1 à 6 mois","Plus de 6 mois","Je ne sais pas"]},
+ {k:"attentes", label:"Qu’aimeriez-vous que ce programme vous apporte ?", type:"textarea"},
+ {k:"suivi", label:"Êtes-vous actuellement accompagné(e) par un professionnel de santé pour cette difficulté ?", type:"choice", options:["Oui","Non","Je préfère en parler plus tard"],
+  hint:"Cette information sert uniquement à vérifier que le programme vous convient. Elle ne remplace pas un suivi."},
+ {k:"adaptation", label:"Y a-t-il quelque chose à prendre en compte pour adapter votre parcours ?", type:"text", hint:"Par exemple : accessibilité, lecture, horaires, langue."},
+ {k:"disponibilites", label:"Formule 3 : quels moments vous conviennent pour les appels ?", type:"text", plan:"appels"},
+];
+export const EVALUATION_NOTICE = "Ce formulaire n’est pas lu en temps réel. Si vous êtes en danger ou pensez à vous faire du mal, n’attendez pas de réponse : appelez le SAMU (185) ou rendez-vous aux urgences de l’hôpital le plus proche.";

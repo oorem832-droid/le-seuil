@@ -136,6 +136,36 @@ export function createSupabaseBackend(url, key) {
     async coachAppointment(id, status, start) { ok(await sb.rpc('coach_update_appointment', { aid: id, new_status: status, new_start: start || null })); },
     async coachReviewQuestionnaire(id, note) { ok(await sb.rpc('coach_review_questionnaire', { qid: id, note })); },
 
+    // ---------- Espace accompagnante (fonctions serveur tracées) ----------
+    async staffDashboard() { return ok(await sb.rpc('staff_dashboard')); },
+    async staffParticipants() { return ok(await sb.rpc('staff_participants')); },
+    async staffParticipant(id) { return ok(await sb.rpc('staff_participant', { eid: id })); },
+    async staffAgenda() { return ok(await sb.rpc('staff_agenda')); },
+    async exportNotes(id, reason) { return ok(await sb.rpc('staff_export_notes', { eid: id, reason: reason || '' })); },
+    async scheduleAppointment(id, n, startsAt, mode) { return ok(await sb.rpc('coach_schedule_appointment', { eid: id, n, start_at: startsAt, how: mode })); },
+    async setAvailability(av, hrs, hoursText, delayText) { ok(await sb.rpc('coach_set_availability', { av, hrs, hours_text: hoursText, delay_text: delayText })); },
+    async noteSave(enrolmentId, n) {
+      const row = { occurred_at: n.occurred_at, exchange_type: n.exchange_type, topic: n.topic, needs: n.needs, tools: n.tools, observations: n.observations,
+        actions: n.actions, next_step: n.next_step, next_contact_at: n.next_contact_at || null };
+      if (n.id) ok(await sb.from('coach_notes').update(row).eq('id', n.id));
+      else ok(await sb.from('coach_notes').insert({ ...row, enrolment_id: enrolmentId, coach_id: uid }));
+    },
+    async noteArchive(id, archived) { ok(await sb.from('coach_notes').update({ archived_at: archived ? new Date().toISOString() : null }).eq('id', id)); },
+    async noteVersions(id) { return ok(await sb.from('coach_note_versions').select('version, edited_at, snapshot').eq('note_id', id).order('version', { ascending: false })); },
+    async taskSave(t) {
+      const row = { title: t.title, due_at: t.due_at || null, enrolment_id: t.enrolment_id || null, request_id: t.request_id || null };
+      if (t.id) ok(await sb.from('staff_tasks').update(row).eq('id', t.id)); else ok(await sb.from('staff_tasks').insert(row));
+    },
+    async taskDone(id, done) { ok(await sb.from('staff_tasks').update({ done_at: done ? new Date().toISOString() : null }).eq('id', id)); },
+    // ---------- Sécurité du compte (double authentification TOTP) ----------
+    async security() { return ok(await sb.rpc('my_security')); },
+    async aal() { const { data } = await sb.auth.mfa.getAuthenticatorAssuranceLevel(); return data || { currentLevel: 'aal1', nextLevel: 'aal1' }; },
+    async mfaFactors() { const { data } = await sb.auth.mfa.listFactors(); return (data?.totp || []); },
+    async mfaEnroll() { return ok(await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'LE SEUIL ' + new Date().toISOString().slice(0, 10) })); },
+    async mfaVerify(factorId, code) { ok(await sb.auth.mfa.challengeAndVerify({ factorId, code })); await sb.auth.refreshSession(); },
+    async mfaUnenroll(factorId) { ok(await sb.auth.mfa.unenroll({ factorId })); },
+    async requireMfa(on) { ok(await sb.rpc('admin_require_mfa', { enable: on })); },
+
     // ---------- Administration ----------
     async overview() { return ok(await sb.rpc('admin_overview'))[0] || {}; },
     async stats(slug) { return ok(await sb.rpc('admin_programme_stats', { p_slug: slug })); },

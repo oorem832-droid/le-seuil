@@ -13,11 +13,15 @@ export const PROGRAMME_SLUG = 'inquietudes';
 export const C = { articles: [], programmes: [], programme: null, weeks: [], videos: [], plans: [], flags: {} };
 
 const fresh = () => ({ user: null, profile: null, enrolments: [], enrolment: null, progress: {}, completions: {}, responses: {}, journal: [], goals: [], ratings: [],
-  summaries: {}, saved: { article: new Set(), worksheet: new Set() }, messages: [], appointments: [], suggestions: [], coach: null, questionnaires: [], coachProfile: null });
+  summaries: {}, saved: { article: new Set(), worksheet: new Set() }, messages: [], appointments: [], suggestions: [], coach: null, questionnaires: [], coachProfile: null, aal: null, security: null });
 export let S = fresh();
 
 export const isStaff = () => ['admin', 'editor'].includes(S.user?.role);
 export const isCoach = () => S.user?.role === 'coach';
+// Équipe d'accompagnement : la fondatrice (administratrice et accompagnante) et les accompagnantes.
+export const isTeam = () => ['admin', 'coach'].includes(S.user?.role);
+// Double authentification : un compte d'équipe qui a activé la MFA doit valider son code avant tout accès privé.
+export const needsMfa = () => (isTeam() || isStaff()) && S.aal?.nextLevel === 'aal2' && S.aal?.currentLevel !== 'aal2';
 export const plan = () => S.enrolment?.plan || 'autonome';
 export const supportOpen = () => (plan() === 'ecrit' && C.flags.written_support) || (plan() === 'appels' && C.flags.support_calls);
 
@@ -46,13 +50,15 @@ export async function loadUser() {
   S.journal = d.journal; S.goals = d.goals; S.ratings = d.ratings; S.messages = d.messages; S.appointments = d.appointments; S.suggestions = d.suggestions;
   d.summaries.forEach(r => { S.summaries[r.week_number] = r; });
   d.saved.forEach(r => S.saved[r.kind]?.add(r.ref));
-  if (S.user.role === 'coach') S.coachProfile = await api.coachProfile();
-  if (isStaff() || isCoach()) { await loadContent(); }
+  if (isTeam() || isStaff()) {
+    S.aal = await api.aal().catch(() => null);
+    if (!needsMfa()) { S.coachProfile = await api.coachProfile().catch(() => null); S.security = await api.security().catch(() => null); await loadContent(); }
+  }
   // Programme de l'inscription choisie : ses semaines ne sont chargées que si l'accès est autorisé (vérifié côté serveur).
   if (S.enrolment) {
     C.programme = C.programmes.find(x => x.uuid === S.enrolment.programme_id) || C.programme;
     C.weeks = validEnrolment(S.enrolment) ? await api.weeks(S.enrolment.programme_id) : [];
-  } else if (isStaff() && C.programme) C.weeks = await api.weeks(C.programme.uuid);
+  } else if (isStaff() && C.programme && !needsMfa()) C.weeks = await api.weeks(C.programme.uuid);
 }
 export async function switchEnrolment(id) {
   preferredEnrolment = id; try { localStorage.setItem('leseuil-programme', id); } catch (e) {}
@@ -72,6 +78,8 @@ export async function boot() {
   await loadUser();
 }
 
+export async function refreshSecurity() { S.aal = await api.aal().catch(() => null); S.security = await api.security().catch(() => null); }
+export async function reloadAfterMfa() { await loadContent(); await loadUser(); }
 export async function demoLogin(id) { await api.demoLogin(id); await loadContent(); await loadUser(); }
 export async function signOut() { await api.signOut(); S = fresh(); await loadContent(); }
 export async function resetDemo() { await api.resetDemo(); S = fresh(); await loadContent(); }

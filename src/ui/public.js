@@ -9,11 +9,12 @@ import { C, S, DEMO, api } from "../store.js";
 
 export const NAV = [["accueil","Accueil"],["apropos","À propos"],["bibliotheque","Bibliothèque"],["programmes","Nos programmes"],["contact","Contact"]];
 const navActive = (r) => r.startsWith("article-") || r.startsWith("bibliotheque") ? "bibliotheque" : r.startsWith("programme-") ? "programmes" : r === "decouvrir" ? "apropos" : r;
-export const homeRoute = () => !S.user ? "connexion" : store.isCoach() ? "accompagnante" : store.isStaff() ? "admin" : "espace";
+// Redirection selon le rôle : équipe → Espace accompagnante (après la double authentification) ; participant → Mon espace.
+export const homeRoute = () => !S.user ? "connexion" : store.needsMfa() ? "verification" : store.isTeam() ? "accompagnante" : store.isStaff() ? "accompagnante-programmes" : "espace";
 
 export function header(){
   const a = navActive(ui.route);
-  const who = S.user ? (store.isCoach() ? "Espace accompagnante" : store.isStaff() ? "Administration" : "Mon espace") : "Se connecter";
+  const who = S.user ? (store.isTeam() || store.isStaff() ? "Espace accompagnante" : "Mon espace") : "Se connecter";
   return `<div class="sos" role="note"><div class="wrap">${icon("phone")}<span><b>LE SEUIL n’est pas un service d’urgence.</b> En danger immédiat : SAMU <b>185</b> · Pompiers <b>180</b> · Police <b>170</b></span><a href="#aide" data-go="aide">Trouver de l’aide</a></div></div>
   ${DEMO ? `<div class="demo-bar"><div class="wrap">${icon("info")}<span>Maquette de démonstration · données fictives · ne pas utiliser avec de vrais participants</span></div></div>` : ""}
   <header class="site"><div class="wrap" style="position:relative">

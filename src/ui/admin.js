@@ -5,10 +5,11 @@ import { esc, icon, fmtDate, toast, $, blocksToText, textToBlocks } from "./util
 import { ui, actions, forms, changes, rerender, go } from "./state.js";
 import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
-import { aRequests, aParticipants, aLibrary } from "./admin2.js";
+import { aLibrary } from "./admin2.js";
+import { staffShell } from "./staff.js";
 
 const A = ui.admin;
-const TABS = [["vue","Vue d’ensemble","chart"],["demandes","Demandes d’inscription","bell"],["participants","Participants","users"],["bibliotheque","Bibliothèque","book"],["programmes","Programmes","path"],["equipe","Équipe et accompagnantes","user"],["fonctionnalites","Fonctionnalités","bell"],["contact","Messages de contact","chat"],["confidentialite","Confidentialité et traçabilité","shield"]];
+const TABS = [["vue","Vue d’ensemble"],["bibliotheque","Bibliothèque"],["equipe","Équipe et accompagnantes"],["fonctionnalites","Fonctionnalités"],["contact","Messages de contact"],["confidentialite","Confidentialité et traçabilité"]];
 const PLAN = { autonome: "Autonome", ecrit: "Accompagnement écrit", appels: "Accompagnement par appels" };
 const ROLE = { member: "Participant", editor: "Rédaction", coach: "Accompagnante", admin: "Administration" };
 const STATUS = { draft: "Brouillon", demo: "Maquette (visible)", published: "Publié", archived: "Archivé" };
@@ -23,17 +24,18 @@ async function need(key, fn){
 const drop = (...keys) => keys.forEach(k => { delete A[k]; });
 const loading = `<p class="muted">Chargement…</p>`;
 function shell(inner, tab){
-  return `<div class="wrap app"><nav class="side" aria-label="Administration"><div class="who"><span class="eyebrow">Administration</span><div class="who-name">${esc(S.user.name)}</div><span class="small muted">${ROLE[S.user.role]}</span></div>
-   ${TABS.filter(([k]) => S.user.role === "admin" || ["programmes","bibliotheque"].includes(k)).map(([k,l,i])=>`<button data-act="a-tab" data-v="${k}" ${tab===k?'aria-current="page"':""}>${icon(i)}<span>${l}</span></button>`).join("")}
-   <button data-act="logout">${icon("out")}<span>Se déconnecter</span></button></nav><div class="stack-lg fade-in" style="min-width:0">${inner}</div></div>`;
+  // Toutes les pages d'administration s'affichent dans le menu privé de l'Espace accompagnante.
+  if (tab === "programmes") return staffShell(inner, "accompagnante-programmes");
+  const tabs = TABS.filter(([k]) => S.user.role === "admin" || k === "bibliotheque");
+  return staffShell(`<div class="tabs" role="tablist" aria-label="Administration">${tabs.map(([k,l]) => `<button role="tab" data-act="a-tab" data-v="${k}" aria-selected="${tab===k}">${l}</button>`).join("")}</div>${inner}`, "admin");
 }
 const H = (t, extra="", lede="") => `<div class="section-head" style="margin:0"><div class="stack" style="gap:6px"><span class="eyebrow">Administration</span><h1 class="h-page">${t}</h1>${lede?`<p class="muted">${lede}</p>`:""}</div>${extra}</div>`;
-actions["a-tab"] = async (b) => { ui.adminTab = b.dataset.v; ui.editing = null; ui.confirm = null; drop("overview","stats","enrolments","team","coaches","privacy","contact","log","referrals","programmes","articles","requests","participants","versions"); ui.newParticipant = null; ui.partSel = null; A.prog = null; A.progId = null; await store.loadContent(); go("admin"); };
+actions["a-tab"] = async (b) => { ui.adminTab = b.dataset.v; ui.editing = null; ui.confirm = null; drop("overview","stats","enrolments","team","coaches","privacy","contact","log","referrals","programmes","articles","requests","participants","versions"); ui.newParticipant = null; ui.partSel = null; A.prog = null; A.progId = null; await store.loadContent(); go(ui.adminTab === "programmes" ? "accompagnante-programmes" : "admin"); };
 
 export function aMain(){
   const t = ui.adminTab;
   if (S.user.role === "editor" && !["programmes","bibliotheque"].includes(t)) ui.adminTab = "bibliotheque";
-  return ({ vue: aOverview, demandes: () => aRequests(shell), participants: () => aParticipants(shell), bibliotheque: () => aLibrary(shell), articles: () => aLibrary(shell), inscriptions: () => aParticipants(shell), programmes: aProgrammes, equipe: aTeam, fonctionnalites: aFlags, contact: aContact, confidentialite: aPrivacy }[ui.adminTab] || aOverview)();
+  return ({ vue: aOverview, bibliotheque: () => aLibrary(shell), articles: () => aLibrary(shell), programmes: aProgrammes, equipe: aTeam, fonctionnalites: aFlags, contact: aContact, confidentialite: aPrivacy }[ui.adminTab] || aOverview)();
 }
 
 /* ---------- Vue d'ensemble ---------- */
