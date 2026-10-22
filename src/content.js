@@ -50,12 +50,26 @@ export const CATALOGUE_SIZE = 11;
    6 catégories officielles restent à fournir par LE SEUIL. */
 export const PROGRAMME_CATALOGUE = [
  {slug:"inquietudes", code:"01", order:1, status:"demo", open:true, hue:"sage",
-  title:"Apprendre à gérer mes inquiétudes", category:"Anxiété et inquiétudes",
+  title:"Apprendre à gérer mes inquiétudes", category:"Anxiété et peurs",
   summary:"Comprendre comment fonctionnent les inquiétudes et expérimenter des outils pratiques inspirés des TCC.",
   intro:"« Et si je perdais mon emploi ? Et si quelque chose arrivait à un proche ? » Lorsque ces questions reviennent sans cesse, les inquiétudes peuvent prendre beaucoup de place et nous épuiser.",
   goal:"Pendant six semaines, vous allez découvrir comment fonctionnent les inquiétudes et expérimenter des outils pratiques inspirés des thérapies cognitivo-comportementales. Vous avancez à votre rythme, notez vos réflexions et revenez aux exercices qui vous aident.",
   benefits:["Mieux comprendre ce qui se passe lorsque vous vous inquiétez","Distinguer les problèmes concrets des inquiétudes hypothétiques","Aborder un problème concret étape par étape","Examiner vos pensées avec plus de nuance et faire de la place à l’incertitude"],
-  library:["Anxiété et peurs","Bien-être au quotidien"]}
+  library:["Anxiété et peurs","Bien-être au quotidien"]},
+ {slug:"peurs", code:"02", order:2, status:"demo", open:true, hue:"forest",
+  title:"Faire face à mes peurs, pas à pas", category:"Anxiété et peurs",
+  summary:"Comprendre la peur, l’évitement et les réactions du corps, puis essayer de petits changements adaptés.",
+  intro:"Certaines peurs finissent par décider à notre place : on se tait en réunion, on reporte une démarche, on évite des situations pourtant sûres. Sur le moment, éviter soulage ; avec le temps, la peur prend plus de place.",
+  goal:"Ce programme de psychoéducation et d’auto-assistance, inspiré de la TCC de faible intensité, aide à comprendre la peur, l’évitement et les réactions corporelles, puis à essayer de petits changements adaptés dans des situations suffisamment sûres. Les exercices ne concernent jamais des situations réellement dangereuses.",
+  benefits:["Comprendre la peur et les réactions d’alarme de votre corps","Repérer vos habitudes d’évitement et ce qu’elles vous coûtent","Préparer puis essayer de petits pas progressifs, à votre rythme","Reconnaître vos progrès et préparer la suite"],
+  library:["Anxiété et peurs","Bien-être au quotidien"]},
+ {slug:"elan", code:"03", order:3, status:"demo", open:true, hue:"gold",
+  title:"Retrouver progressivement mon élan", category:"Moral et motivation",
+  summary:"Comprendre les liens entre moral et activités, et retrouver progressivement des moments importants.",
+  intro:"Quand le moral baisse, des choses qui semblaient simples deviennent difficiles : on voit moins ses proches, on abandonne ce qu’on aimait, on attend une motivation qui ne vient pas.",
+  goal:"Six semaines pour comprendre les liens entre moral et activités, retrouver progressivement des moments importants et construire des habitudes adaptées à votre réalité. Un programme structuré de psychoéducation et d’auto-accompagnement informé par l’activation comportementale, sans promesse de guérison.",
+  benefits:["Comprendre les liens entre votre moral et vos activités","Observer votre quotidien avec curiosité, sans vous juger","Retrouver pas à pas des activités qui comptent pour vous, selon vos ressources","Construire un plan personnel pour préserver votre élan"],
+  library:["Dépression et humeur","Bien-être au quotidien"]}
 ];
 
 /* « Mes outils pour retrouver mon calme » — textes repris du document du Programme 01. */

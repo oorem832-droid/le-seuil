@@ -38,20 +38,37 @@ sql += `insert into public.articles (slug, title, category, excerpt, body, secti
 writeFileSync(new URL('../supabase/seed.sql', import.meta.url), sql);
 console.log('supabase/seed.sql written');
 
-// Contenu privé du Programme 01
-const priv = new URL('../private/programme01.js', import.meta.url);
-if (existsSync(priv)) {
-  const { PROGRAMME_01: P } = await import(priv.href);
-  let s = `-- PRIVÉ — contenu des leçons du Programme 01. Ne pas publier. À exécuter dans le SQL Editor de Supabase.\n\n`;
-  s += `update public.programmes set intro = ${q(txt(P.intro))}, objectives = ${arr(P.objectives)}, measures = ${json(P.measures)} where slug = ${q(P.slug)};\n\n`;
-  for (const w of P.weeks) {
-    s += `insert into public.programme_weeks (programme_id, week_number, title, intro)\n  select id, ${w.n}, ${q(w.title)}, ${q(txt(w.intro))} from public.programmes where slug = ${q(P.slug)}\non conflict (programme_id, week_number) do nothing;\n`;
-    w.steps.forEach((st, i) => {
-      const { id, kind, title, required, ...content } = st;
-      s += `insert into public.programme_steps (week_id, step_key, position, kind, title, required, content)\n  select w.id, ${q(id)}, ${i}, ${q(kind)}, ${q(title)}, ${(required ?? kind !== 'video') ? 'true' : 'false'}, ${json(content)}\n  from public.programme_weeks w join public.programmes p on p.id = w.programme_id where p.slug = ${q(P.slug)} and w.week_number = ${w.n}\non conflict (week_id, step_key) do nothing;\n`;
-    });
-  }
+// Contenu privé des programmes (private/programmeXX.js → supabase/private/programme-XX.sql). Jamais dans le dépôt.
+const privDir = new URL('../private/', import.meta.url);
+const stepSQL = (P, w, st, pos, mode = 'nothing') => {
+  const { id, kind, title, required, position_offset, ...content } = st;
+  return `insert into public.programme_steps (week_id, step_key, position, kind, title, required, content)\n  select w.id, ${q(id)}, ${pos}, ${q(kind)}, ${q(title)}, ${(required ?? kind !== 'video') ? 'true' : 'false'}, ${json(content)}\n  from public.programme_weeks w join public.programmes p on p.id = w.programme_id where p.slug = ${q(P.slug)} and w.week_number = ${w.n}\non conflict (week_id, step_key) do ${mode === 'update' ? 'update set content = excluded.content' : 'nothing'};\n`;
+};
+// Les étapes « point de départ » ont des positions négatives : elles s'insèrent avant les étapes existantes.
+const positions = (w) => { const off = w.steps.filter(s => s.position_offset).length; let a = -off, b = 0; return w.steps.map(s => s.position_offset ? a++ : b++); };
+if (existsSync(privDir)) {
+  const { readdirSync } = await import('node:fs');
   mkdirSync(new URL('../supabase/private/', import.meta.url), { recursive: true });
-  writeFileSync(new URL('../supabase/private/programme-01.sql', import.meta.url), s);
-  console.log('supabase/private/programme-01.sql written (PRIVÉ)');
+  for (const f of readdirSync(privDir).filter(f => /^programme\d\d\.js$/.test(f)).sort()) {
+    const code = f.match(/\d\d/)[0];
+    const P = (await import(new URL(f, privDir).href))[`PROGRAMME_${code}`];
+    let s = `-- PRIVÉ — contenu des leçons du Programme ${code} (${P.title}). Ne pas publier. À exécuter dans le SQL Editor de Supabase,\n-- après supabase/seed.sql (qui crée la présentation publique du programme).\n\n`;
+    s += `update public.programmes set intro = ${q(txt(P.intro))}, objectives = ${arr(P.objectives)}, measures = ${json(P.measures)} where slug = ${q(P.slug)};\n\n`;
+    for (const w of P.weeks) {
+      s += `insert into public.programme_weeks (programme_id, week_number, title, intro)\n  select id, ${w.n}, ${q(w.title)}, ${q(txt(w.intro))} from public.programmes where slug = ${q(P.slug)}\non conflict (programme_id, week_number) do nothing;\n`;
+      const pos = positions(w);
+      w.steps.forEach((st, i) => { s += stepSQL(P, w, st, pos[i]); });
+    }
+    writeFileSync(new URL(`../supabase/private/programme-${code}.sql`, import.meta.url), s);
+    console.log(`supabase/private/programme-${code}.sql written (PRIVÉ)`);
+    // Programme 01, déjà en ligne : mise à jour ciblée (point de départ + bilans des semaines 3 et 6), sans toucher au reste.
+    if (code === '01') {
+      let u = `-- PRIVÉ — mise à jour du Programme 01 déjà installé : ajoute « Mon point de départ » et le relie aux bilans des semaines 3 et 6.\n\n`;
+      const w1 = P.weeks[0], p1 = positions(w1);
+      w1.steps.forEach((st, i) => { if (st.position_offset) u += stepSQL(P, w1, st, p1[i]); });
+      for (const n of [3, 6]) { const w = P.weeks[n - 1], p = positions(w); w.steps.forEach((st, i) => { if (st.fields?.some(x => x.type === 'baseline_recall')) u += stepSQL(P, w, st, p[i], 'update'); }); }
+      writeFileSync(new URL('../supabase/private/programme-01-mise-a-jour.sql', import.meta.url), u);
+      console.log('supabase/private/programme-01-mise-a-jour.sql written (PRIVÉ)');
+    }
+  }
 }

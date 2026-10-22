@@ -423,3 +423,9 @@ main h1[tabindex="-1"]:focus,main h2[tabindex="-1"]:focus{outline:none}
 .prog-switch{flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .part-detail{border:1.5px solid var(--sage)}
 @media (max-width:640px){.plan-pick{grid-template-columns:1fr}.crumbs li[aria-current]{max-width:18ch}}
+.example{background:var(--cream-2,#f3ecdf);border-left:3px solid var(--gold);padding:10px 14px;border-radius:var(--r-md,12px);font-style:italic}
+.recall-list{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:8px}
+details.recall summary{cursor:pointer}
+/* Catalogue : une carte seule ne s'étire pas sur toute la largeur */
+.prog-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.recall p.small{font-family:inherit}

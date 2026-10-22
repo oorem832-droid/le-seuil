@@ -23,7 +23,7 @@ export function pProgrammes(){
   <section class="section" style="padding-top:36px"><div class="wrap stack-lg">
    ${cats.length > 1 ? `<nav class="chips" aria-label="Catégories de programmes">${cats.map(c => `<a class="chip" href="#cat-${catSlug(c)}">${esc(c)}</a>`).join("")}</nav>` : ""}
    ${cats.map(c => `<section class="stack" id="cat-${catSlug(c)}" aria-labelledby="h-${catSlug(c)}"><h2 class="h-sub" id="h-${catSlug(c)}">${esc(c)}</h2>
-     <div class="grid g3">${list.filter(p => (p.category || "Programmes") === c).map(progCard).join("")}</div></section>`).join("")}
+     <div class="grid prog-grid">${list.filter(p => (p.category || "Programmes") === c).map(progCard).join("")}</div></section>`).join("")}
    ${missing > 0 ? `<div class="card-flat stack soon-card"><span class="tag warn" style="align-self:flex-start">En préparation</span><h3>${missing} autres programmes arrivent</h3><p class="muted">Le catalogue LE SEUIL accueillera progressivement onze programmes, tous construits sur le même modèle de six semaines.</p></div>` : ""}
    ${howToJoin()}
   </div></section>`;

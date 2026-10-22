@@ -49,6 +49,7 @@ export function mDash(){
     const why = !e ? "Aucun programme n’est encore associé à votre compte."
       : S.profile?.account_status === "suspended" || e.suspended ? "Votre accès est suspendu pour le moment."
       : e.admission_status !== "admis" ? "Votre demande est en cours de vérification par l’équipe LE SEUIL."
+      : !["paye", "offert"].includes(e.payment_status) ? "Votre accès s’ouvrira dès que l’équipe LE SEUIL aura confirmé votre paiement."
       : e.access_expires_at && new Date(e.access_expires_at) <= new Date() ? `Votre accès au programme s’est terminé le ${fmtDate(e.access_expires_at)}.`
       : e.access_starts_at && new Date(e.access_starts_at) > new Date() ? `Votre accès ouvrira le ${fmtDate(e.access_starts_at)}.` : "Votre accès n’est pas encore actif.";
     return memberShell(H("Mon espace", `Bonjour, ${esc(S.user.name)}`) + `${switcher()}<div class="card stack"><p>${why}</p><p class="small muted">Pour toute question sur votre accès, écrivez-nous depuis la page <a href="#contact" data-go="contact">Contact</a>. Les articles de la <a href="#bibliotheque" data-go="bibliotheque">Bibliothèque</a> restent en accès libre.</p></div>`);

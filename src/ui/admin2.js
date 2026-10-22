@@ -70,7 +70,7 @@ export function aParticipants(shell) {
      <div class="field"><label class="flabel" for="np-plan">Formule *</label><select id="np-plan">${Object.entries(PLAN).map(([k, l]) => `<option value="${k}" ${np.plan === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
      <div class="field"><label class="flabel" for="np-coach">Accompagnante (formules 2 et 3)</label><select id="np-coach"><option value="">—</option>${coaches.map(c => `<option value="${c.id}">${esc(c.first_name)}</option>`).join("")}</select></div></div>
     <div class="grid g3" style="gap:12px">
-     <div class="field"><label class="flabel" for="np-pay">État du paiement *</label><select id="np-pay">${Object.entries(PAY).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></div>
+     <div class="field"><label class="flabel" for="np-pay">État du paiement *</label><select id="np-pay">${Object.entries(PAY).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select><span class="hint">Les leçons ne s’ouvrent que si le paiement est « Payé » ou « Offert » et l’admission « Admis ».</span></div>
      <div class="field"><label class="flabel" for="np-adm">Admission *</label><select id="np-adm">${Object.entries(ADM).map(([k, l]) => `<option value="${k}" ${k === "admis" ? "selected" : ""}>${l}</option>`).join("")}</select></div>
      <div class="field"><label class="flabel" for="np-lang">Langue</label><select id="np-lang"><option value="fr">Français</option><option value="en">English</option></select></div></div>
     <div class="grid g2" style="gap:12px">

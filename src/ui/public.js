@@ -63,7 +63,7 @@ export function pHome(){
   <section class="section"><div class="wrap">
    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:48px;align-items:start">
     <div class="stack"><span class="eyebrow">Qu’est-ce que LE SEUIL ?</span><h2>Un passage entre le silence et la parole.</h2>
-     <p class="lede">LE SEUIL propose des ressources de psychoéducation et des programmes interactifs d’auto-assistance inspirés des thérapies cognitives et comportementales (TCC). Nous orientons vers des professionnels qualifiés lorsque c’est nécessaire.</p>
+     <p class="lede">LE SEUIL propose des ressources de psychoéducation et des programmes interactifs d’auto-assistance inspirés des thérapies cognitives et comportementales (TCC). Selon les besoins identifiés, nous pouvons orienter les personnes vers les structures, services ou organismes adaptés à leur situation.</p>
      <button class="linkbtn" data-go="apropos" style="align-self:flex-start">Découvrir notre mission et notre approche</button></div>
     <div class="grid" style="gap:14px">
      ${[["Soutien","Ne plus traverser seul les moments difficiles, avec des outils et des repères fiables."],["Compréhension","Mettre des mots simples sur ce que l’on vit, sans jugement et sans jargon."],["Équilibre","Avancer à son rythme vers un quotidien plus serein, pas à pas."]].map(([t,d])=>`<div class="card-flat"><h3>${t}</h3><p class="muted">${d}</p></div>`).join("")}
@@ -91,9 +91,9 @@ export function pHome(){
   <section class="section band"><div class="wrap founder">
    <div class="portrait" aria-hidden="true">${icon("user","icon")}</div>
    <div class="stack"><span class="eyebrow">La fondatrice</span><h2>Une expérience d’accompagnement au service d’un projet de cœur</h2>
-    <p class="lede">La fondatrice de LE SEUIL est <b>Psychological Wellbeing Practitioner</b> qualifiée au Royaume-Uni, avec une expérience des interventions de faible intensité, de la psychoéducation et des approches structurées inspirées des TCC.</p>
-    <p class="muted">Elle a voulu rendre ces outils accessibles en français, dans un cadre adapté au contexte ivoirien, et contribuer à ce que demander de l’aide devienne un geste ordinaire. Elle n’est ni psychologue clinicienne ni psychiatre : lorsque votre situation le nécessite, LE SEUIL vous oriente vers des professionnels habilités.</p>
-    <p class="small muted"><em>Nom, photo et parcours détaillé à compléter.</em></p></div>
+    <p class="lede">LE SEUIL a été fondé par <b>Judie Ore</b>, ancienne <b>Psychological Wellbeing Practitioner (PWP)</b> au Royaume-Uni, formée aux interventions psychologiques de faible intensité et ayant exercé au sein des services britanniques de Talking Therapies.</p>
+    <p class="muted">Elle a voulu rendre ces outils accessibles en français, dans un cadre adapté au contexte ivoirien, et contribuer à ce que demander de l’aide devienne un geste ordinaire. Elle se présente comme accompagnante en bien-être psychologique ; elle n’est ni psychologue ni psychiatre en Côte d’Ivoire. Selon les besoins identifiés, LE SEUIL peut orienter les personnes vers les structures, services ou organismes adaptés à leur situation.</p>
+    <p class="small muted"><em>Photo et parcours détaillé à compléter.</em></p></div>
   </div></section>
 
   <section class="section"><div class="wrap">${limitsCards()}</div></section>`;
@@ -110,8 +110,10 @@ export function pAbout(){
    <div class="prose">
     <h2>Notre mission</h2>
     <p>Rendre les ressources de bien-être psychologique plus accessibles, compréhensibles et moins intimidantes, en commençant par la Côte d’Ivoire puis en s’ouvrant au public francophone.</p>
-    <ul><li>Déstigmatiser les difficultés psychologiques et la demande d’aide.</li><li>Proposer des informations fiables et accessibles.</li><li>Développer des programmes structurés d’auto-assistance, inspirés des TCC.</li><li>Orienter vers des professionnels qualifiés lorsque c’est nécessaire.</li><li>Encourager la prévention, la connaissance de soi et le bien-être émotionnel.</li></ul>
+    <ul><li>Déstigmatiser les difficultés psychologiques et la demande d’aide.</li><li>Proposer des informations fiables et accessibles.</li><li>Développer des programmes structurés d’auto-assistance, inspirés des TCC.</li><li>Selon les besoins identifiés, nous pouvons orienter les personnes vers les structures, services ou organismes adaptés à leur situation.</li><li>Encourager la prévention, la connaissance de soi et le bien-être émotionnel.</li></ul>
     <h2>Notre approche</h2>
+    <p>LE SEUIL propose des ressources de psychoéducation et des programmes structurés de bien-être psychologique inspirés des techniques de thérapie cognitive et comportementale (TCC) de faible intensité. Cette approche aide à comprendre les liens entre pensées, émotions, sensations physiques et comportements, puis à essayer des stratégies pratiques dans la vie quotidienne.</p>
+    <p>« Faible intensité » ne signifie pas que les difficultés vécues sont insignifiantes : l’expression décrit surtout un format structuré, ciblé, souvent moins intensif en temps d’accompagnement qu’une psychothérapie traditionnelle. Les programmes de LE SEUIL sont des ressources de bien-être psychologique et d’auto-assistance, avec accompagnement selon la formule.</p>
     <p>Chaque programme dure six semaines. Les leçons sont standardisées : tous les participants d’un même programme reçoivent les mêmes contenus. Vos réponses, votre journal et vos objectifs, eux, n’appartiennent qu’à vous.</p>
     <p>LE SEUIL ne se présente pas comme un service de diagnostic, de psychothérapie ou de prise en charge psychiatrique.</p>
     <h2>L’accompagnement</h2>

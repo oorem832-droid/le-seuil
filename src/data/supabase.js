@@ -2,7 +2,7 @@
 // ce fichier ne fait que traduire les appels.
 import { createClient } from '@supabase/supabase-js';
 
-export const validEnrolment = (e) => e && ['demo', 'active', 'completed'].includes(e.status) && !e.suspended && e.admission_status === 'admis'
+export const validEnrolment = (e) => e && ['demo', 'active', 'completed'].includes(e.status) && !e.suspended && e.admission_status === 'admis' && ['paye', 'offert'].includes(e.payment_status)
   && (!e.access_starts_at || new Date(e.access_starts_at) <= new Date()) && (!e.access_expires_at || new Date(e.access_expires_at) > new Date());
 
 export function createSupabaseBackend(url, key) {

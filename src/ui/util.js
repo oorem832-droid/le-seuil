@@ -82,6 +82,7 @@ export function blocksHTML(blocks){
     if (b.t === "h") return `<h3>${esc(b.text)}</h3>`;
     if (b.t === "ul") return `<ul>${b.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>`;
     if (b.t === "ol") return `<ol>${b.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ol>`;
+    if (b.t === "ex") return `<p class="example">${esc(b.text)}</p>`;
     return `<p>${esc(b.text)}</p>`;
   }).join("");
 }

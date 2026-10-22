@@ -5,14 +5,14 @@ import { PLANS, COACH, PROGRAMME_CATALOGUE } from '../content.js';
 import { LIBRARY, LIBRARY_REFERENCES } from '../library.js';
 import { validEnrolment } from './supabase.js';
 // Le contenu des leçons n'est jamais dans le dépôt public : il est chargé seulement s'il existe localement (dossier private/).
-const PRIV = import.meta.glob('../../private/programme01.js', { eager: true });
-const PROGRAMME_01 = Object.values(PRIV)[0]?.PROGRAMME_01 || null;
+const PRIV = import.meta.glob('../../private/programme*.js', { eager: true });
+const PRIVATE_PROGS = Object.fromEntries(Object.values(PRIV).flatMap(m => Object.values(m)).filter(p => p?.slug).map(p => [p.slug, p]));
 // Sans le fichier privé (démo partageable), on affiche des semaines neutres : aucun contenu de leçon réel.
 const PLACEHOLDER_WEEKS = Array.from({ length: 6 }, (_, i) => ({ n: i + 1, title: `Semaine ${i + 1}`, intro: '',
   steps: [{ id: 'apercu', kind: 'lecon', title: 'Contenu réservé aux participants', required: true,
     blocks: [{ t: 'p', text: 'Dans cette démonstration, le texte des leçons n’est pas inclus. Sur le site réel, il n’est transmis qu’aux participants inscrits à ce programme, après connexion.' }] }] }));
 
-const KEY = 'leseuil-demo-v4';
+const KEY = 'leseuil-demo-v5';
 const now = () => new Date().toISOString();
 const id = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2));
 const daysFrom = (d, h = 10) => { const x = new Date(); x.setDate(x.getDate() + d); x.setHours(h, 0, 0, 0); return x.toISOString(); };
@@ -27,17 +27,21 @@ export const PERSONAS = [
 
 function seed() {
   const txt = (bl) => Array.isArray(bl) ? bl.map(b => typeof b === 'string' ? b : b.text || (b.items || []).join('\n')).join('\n\n') : (bl || '');
-  const progs = PROGRAMME_CATALOGUE.map((c, i) => ({ id: i === 0 ? 'p-01' : 'p-' + c.slug, slug: c.slug, code: c.code, title: c.title, summary: c.summary,
-    intro: PROGRAMME_01 && c.slug === PROGRAMME_01.slug ? txt(PROGRAMME_01.intro) : '', objectives: PROGRAMME_01?.objectives || [], status: c.status, cover_hue: c.hue,
-    sort_order: c.order, questionnaires_enabled: false, measures: PROGRAMME_01?.measures || [], category: c.category, public_intro: c.intro, public_goal: c.goal,
-    benefits: c.benefits, format: 'Leçons interactives, courtes vidéos, exercices et outils pratiques, à votre rythme.', library_categories: c.library, open_for_requests: c.open }));
-  const prog = progs[0];
+  const progs = PROGRAMME_CATALOGUE.map((c, i) => { const P = PRIVATE_PROGS[c.slug];
+    return { id: i === 0 ? 'p-01' : 'p-' + c.slug, slug: c.slug, code: c.code, title: c.title, summary: c.summary,
+    intro: P ? txt(P.intro) : '', objectives: P?.objectives || [], status: c.status, cover_hue: c.hue,
+    sort_order: c.order, questionnaires_enabled: false, measures: P?.measures || [], category: c.category, public_intro: c.intro, public_goal: c.goal,
+    benefits: c.benefits, format: 'Leçons interactives, courtes vidéos, exercices et outils pratiques, à votre rythme.', library_categories: c.library, open_for_requests: c.open }; });
   const weeks = [], steps = [];
-  (PROGRAMME_01?.weeks || PLACEHOLDER_WEEKS).forEach(w => {
-    const wid = `w${w.n}`; weeks.push({ id: wid, programme_id: prog.id, week_number: w.n, title: w.title, intro: txt(w.intro) });
-    w.steps.forEach((s, i) => { const { id: key, kind, title, required, ...content } = s;
-      steps.push({ id: `${wid}-${key}`, week_id: wid, step_key: key, position: i, kind, title, required: required ?? kind !== 'video', content }); });
+  progs.forEach((prog, pi) => {
+    (PRIVATE_PROGS[prog.slug]?.weeks || PLACEHOLDER_WEEKS).forEach(w => {
+      const wid = pi === 0 ? `w${w.n}` : `${prog.slug}-w${w.n}`;
+      weeks.push({ id: wid, programme_id: prog.id, week_number: w.n, title: w.title, intro: txt(w.intro) });
+      w.steps.forEach((s, i) => { const { id: key, kind, title, required, position_offset, ...content } = s;
+        steps.push({ id: `${wid}-${key}`, week_id: wid, step_key: key, position: i, kind, title, required: required ?? kind !== 'video', content }); });
+    });
   });
+  const prog = progs[0];
   const t = {
     profiles: PERSONAS.map(p => ({ id: p.id, first_name: p.first_name, last_name: 'Démo', email: p.email, role: p.role, account_status: 'active', must_set_password: false, newsletter_opt_in: false, analytics_opt_in: false, reminders_opt_in: false, created_at: daysFrom(-30) })),
     coach_profiles: [{ user_id: COACH.id, display_name: COACH.name, public_title: COACH.title, bio: COACH.bio, verified: COACH.verified, hours: COACH.hours,
@@ -54,6 +58,7 @@ function seed() {
     participant_admin_notes: [],
     enrolments: [
       { id: 'e-awa', user_id: 'u-awa', programme_id: prog.id, plan: 'ecrit', status: 'active', admission_status: 'admis', payment_status: 'offert', suspended: false, access_expires_at: daysFrom(60), coach_id: COACH.id, suitability_completed_at: daysFrom(-14), consented_at: daysFrom(-14), share_summaries: true, share_goals: true, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-14) },
+      { id: 'e-awa2', user_id: 'u-awa', programme_id: 'p-peurs', plan: 'autonome', status: 'active', admission_status: 'admis', payment_status: 'offert', suspended: false, access_expires_at: daysFrom(60), coach_id: null, suitability_completed_at: daysFrom(-2), consented_at: daysFrom(-2), share_summaries: false, share_goals: false, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-2) },
       { id: 'e-koffi', user_id: 'u-koffi', programme_id: prog.id, plan: 'appels', status: 'active', admission_status: 'admis', payment_status: 'offert', suspended: false, access_expires_at: daysFrom(60), coach_id: COACH.id, suitability_completed_at: daysFrom(-7), consented_at: daysFrom(-7), share_summaries: false, share_goals: false, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-7) },
       { id: 'e-mariam', user_id: 'u-mariam', programme_id: prog.id, plan: 'autonome', status: 'active', admission_status: 'admis', payment_status: 'offert', suspended: false, access_expires_at: daysFrom(60), coach_id: null, suitability_completed_at: null, consented_at: null, share_summaries: false, share_goals: false, questionnaires_enabled: false, last_step_id: null, unlock_all: false, created_at: daysFrom(-1) },
     ],

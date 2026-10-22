@@ -54,7 +54,7 @@ export const isComplete = (uuid) => S.progress[uuid] === "completed";
 
 /* ---------- Rendu des champs ---------- */
 const scaleHTML = (uuid, path, val, f) => `<div class="scale" role="group" aria-label="${esc(f.label)}">
-  ${Array.from({length:11},(_,i)=>`<button type="button" data-act="ex-set" data-w="${uuid}" data-f="${path}" data-v="${i}" ${f.measure?`data-m="${f.measure}"`:""} aria-pressed="${val===i}">${i}</button>`).join("")}
+  ${Array.from({length:11},(_,i)=>`<button type="button" data-act="ex-set" data-w="${uuid}" data-f="${path}" data-v="${i}" ${f.measure?`data-m="${f.measure}"`:""} ${f.week!==undefined?`data-wk="${f.week}"`:""} aria-pressed="${val===i}">${i}</button>`).join("")}
   </div>${f.min||f.max?`<div class="scale-ends"><span>0 · ${esc(f.min||"")}</span><span>10 · ${esc(f.max||"")}</span></div>`:""}`;
 
 function fieldHTML(uuid, f, val, path, step){
@@ -89,6 +89,7 @@ function fieldHTML(uuid, f, val, path, step){
       const g = S.goals.filter(x => x.scope === "principal").sort((a,b)=>a.created_at.localeCompare(b.created_at))[0];
       return `<div class="recall"><span class="flabel">${esc(f.label)}</span>${g?`<p>« ${esc(g.title)} »</p>`:`<p class="muted small">Vous n’aviez pas défini d’objectif principal. Vous pouvez le faire dans <button type="button" class="linkbtn" data-go="objectifs">Mes objectifs</button>.</p>`}</div>`;
     }
+    case "baseline_recall": return baselineRecallHTML(f);
     case "share": {
       if (store.plan() === "autonome") return "";
       if (!store.supportOpen()) return `<p class="small muted">${icon("lock")} Le partage avec votre accompagnante sera possible lorsque l’accompagnement sera ouvert.</p>`;
@@ -97,6 +98,17 @@ function fieldHTML(uuid, f, val, path, step){
     }
     default: return wrap(`<textarea id="${id}" data-w="${uuid}" data-f="${path}" rows="3">${esc(val)}</textarea>`);
   }
+}
+
+/* « Mon point de départ » : la première version enregistrée est conservée (datée) et relue à mi-parcours et à la fin. */
+const baselineStep = () => C.weeks.flatMap(w => w.steps).find(s => s.content?.baseline);
+function baselineRecallHTML(f){
+  const st = baselineStep(); if (!st) return "";
+  const r = S.responses[st.uuid], init = r?._initial;
+  if (!init) return `<div class="recall"><span class="flabel">${esc(f.label || "Mon point de départ")}</span><p class="muted small">Vous n’avez pas encore complété votre point de départ. Il se trouve au début de la semaine 1.</p></div>`;
+  const rows = (st.content.fields || []).filter(x => init[x.k] !== undefined && init[x.k] !== "").map(x => `<li><span class="small muted">${esc(x.label)}</span><br>${esc(x.type === "rating" || x.type === "scale" ? init[x.k] + " / 10" : init[x.k])}</li>`).join("");
+  const when = r._initial_at ? new Date(r._initial_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "";
+  return `<details class="recall" open><summary class="flabel">${esc(f.label || "Relire mon point de départ")}</summary>${when ? `<p class="small muted">Version initiale enregistrée le ${when}.</p>` : ""}<ul class="recall-list">${rows}</ul></details>`;
 }
 
 /* ---------- Rendu d'une étape exercice / bilan ---------- */
@@ -127,7 +139,7 @@ export function exerciseHTML(step, preview=false){
   }
   const done = isComplete(uuid);
   const miss = ui.missing?.[uuid];
-  return `${c.intro?`<p class="lede-sm">${esc(c.intro)}</p>`:""}
+  return `${c.intro?`<p class="lede-sm">${esc(c.intro)}</p>`:""}${c.example?`<p class="example small">${esc(c.example)}</p>`:""}
     ${body}
     ${miss && miss.length ? `<div class="notice" role="alert">${icon("info")}<span>Il reste quelques éléments à compléter, signalés ci-dessus. Votre travail est enregistré : vous pouvez aussi revenir plus tard.</span></div>` : ""}
     ${preview ? "" : `<div class="ex-actions"><div class="row"><button class="btn ${done?"btn-soft":"btn-gold"}" data-act="ex-complete" data-w="${uuid}">${icon("check")}${done?"Mettre à jour":"Enregistrer et terminer"}</button>
@@ -177,7 +189,7 @@ changes.push((t) => {
 actions["ex-set"] = async (b) => {
   const uuid = b.dataset.w, v = /^\d+$/.test(b.dataset.v) && !isNaN(+b.dataset.v) && b.closest(".scale") ? +b.dataset.v : b.dataset.v;
   setPath(data(uuid), b.dataset.f, v);
-  if (b.dataset.m) { const w = weekOfStep(uuid); store.ratingSave(w?.n ?? 0, b.dataset.m, v).catch(console.error); }
+  if (b.dataset.m) { const w = weekOfStep(uuid); store.ratingSave(b.dataset.wk !== undefined ? +b.dataset.wk : (w?.n ?? 0), b.dataset.m, v).catch(console.error); }
   persist(uuid, true); rerender();
 };
 actions["ex-quiz"] = (b) => { const d = data(b.dataset.w); d.answers = d.answers || {}; d.answers[b.dataset.i] = b.dataset.v; persist(b.dataset.w, true); rerender(); };
@@ -214,6 +226,11 @@ export async function completeStep(uuid){
       } else if (S.summaries[w.n]) await store.summaryUnshare(w.n);
     }
   }
+  // Point de départ : la première version complète est figée, datée, et n'est jamais écrasée par les modifications.
+  if (c.baseline && !d._initial) {
+    d._initial = Object.fromEntries((c.fields || []).filter(f => f.k && d[f.k] !== undefined).map(f => [f.k, d[f.k]]));
+    d._initial_at = new Date().toISOString();
+  }
   await store.saveResponse(uuid, d, true);
   await store.setProgress(uuid, "completed");
   ui.missing[uuid] = [];
@@ -227,7 +244,7 @@ export function summaryText(step, d){
   if (c.component === "journal") return d.text || "";
   const line = (f, v) => {
     if (v === undefined || v === null || v === "" || (Array.isArray(v) && !v.length)) return "";
-    if (f.type === "share" || f.type === "goal_recall") return "";
+    if (f.type === "share" || f.type === "goal_recall" || f.type === "baseline_recall") return "";
     if (f.type === "repeat") return `${f.label} :\n` + v.map((r,i)=>`  ${i+1}. ` + f.fields.map(sf => r?.[sf.k] !== undefined && r?.[sf.k] !== "" ? `${sf.label} : ${r[sf.k]}` : "").filter(Boolean).join(" · ")).join("\n");
     if (Array.isArray(v)) return `${f.label} : ${v.join(", ")}`;
     if (f.type === "scale" || f.type === "rating") return `${f.label} : ${v}/10`;

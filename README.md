@@ -80,14 +80,19 @@ Avec Supabase : copier `.env.example` en `.env.local` et renseigner l’URL et l
    - `supabase/migrations/20261019000000_init.sql`
    - `supabase/migrations/20261019000100_storage.sql`
    - `supabase/migrations/20261021000000_bibliotheque_comptes_admin.sql`
+   - `supabase/migrations/20261022000000_acces_paiement_confirme.sql`
    - `supabase/seed.sql` (formules, présentation publique des programmes, 62 articles en « à relire »)
    - le contenu privé des programmes, qui **n’est pas dans ce dépôt** (voir « Contenus privés »).
 3. Ne **jamais** exécuter les fichiers de `supabase/tests/` dans Supabase.
 
-### Projet déjà en ligne (mise à jour v3)
-1. Exécuter `supabase/migrations/20261021000000_bibliotheque_comptes_admin.sql` (le fichier peut être relancé sans risque).
-2. Exécuter `supabase/seed.sql` : les articles déjà présents ne sont pas écrasés.
-3. Ne pas relancer le contenu du Programme 01 : il est déjà en base.
+### Projet déjà en ligne (mise à jour v3 + Programmes 02 et 03)
+1. Exécuter `supabase/migrations/20261021000000_bibliotheque_comptes_admin.sql`, puis `supabase/migrations/20261022000000_acces_paiement_confirme.sql`. Les deux fichiers peuvent être relancés sans risque.
+2. Exécuter `supabase/seed.sql`. Il crée les présentations publiques des Programmes 02 et 03, et les articles déjà présents ne sont pas écrasés.
+3. Exécuter les fichiers privés, transmis à part et absents du dépôt :
+   - `programme-01-mise-a-jour.sql` : ajoute « Mon point de départ » au Programme 01 et le relie aux bilans des semaines 3 et 6 ;
+   - `programme-02.sql` ;
+   - `programme-03.sql`.
+4. Les leçons ne s'ouvrent que si l'inscription est à la fois « Admis » et « Payé » ou « Offert ». Vérifiez ces deux statuts pour les inscriptions existantes dans Administration → Participants.
 
 ### Comptes : aucune inscription publique
 1. **Authentication → Sign In / Providers** : désactiver **Allow new users to sign up**. Seule l’administration crée les comptes.
@@ -159,7 +164,7 @@ Autres règles :
 - **Progression réelle** : ouvrir une page ne termine rien. Une leçon se termine par « J’ai terminé cette leçon ». Un exercice se termine seulement quand ses champs obligatoires sont remplis.
 - Le participant peut exporter ses données, effacer ses données de programme ou demander la suppression de son compte.
 
-Tests : `supabase/tests/rls_test.sql` (55) et `rls_test_v3.sql` (27) passent tous sur une base Postgres locale. Ne pas les exécuter dans Supabase.
+Tests : `supabase/tests/rls_test.sql` (55), `rls_test_v3.sql` (27) et `rls_test_programmes.sql` (13, isolement entre programmes) passent tous sur une base Postgres locale. Ne pas les exécuter dans Supabase.
 
 ## Ajouter ou modifier un programme
 
@@ -176,7 +181,11 @@ Tests : `supabase/tests/rls_test.sql` (55) et `rls_test_v3.sql` (27) passent tou
   - question de réflexion (enregistrée dans Mon journal) ;
   - respiration guidée.
 - **Présentation publique** : la page « Nos programmes » ne montre que les éléments suivants : titre, catégorie, introduction, objectif, bénéfices, durée, format et les trois formules. Ces champs se modifient dans Administration → Programmes, ou dans `PROGRAMME_CATALOGUE` (`src/content.js`) avant d’exécuter `node scripts/generate-seed.mjs`.
-- **Depuis un document Word** : le script d’import se trouve dans `private/source/`, hors dépôt. Le SQL généré, `supabase/private/…`, s’exécute directement dans Supabase.
+- **Depuis un document Word** : les scripts d’import se trouvent dans `private/source/`, hors dépôt.
+  - `import-programme-01.sh` traite le format du Programme 01.
+  - `parse_manuscrit.py` traite le format des Programmes 02 et 03 (« SEMAINE n », « Leçon », « VIDÉO », « EXERCICE », questions en □ ou •). Exemple : `python3 private/source/parse_manuscrit.py manuscrit.docx 04 slug "Titre"`, puis `node scripts/generate-seed.mjs`.
+  - Le SQL généré, `supabase/private/programme-XX.sql`, s’exécute directement dans Supabase.
+- **Mon point de départ** : au début de la semaine 1, avec une note personnelle 0–10 non diagnostique. La première version complète est conservée et datée ; elle n’est jamais écrasée par les modifications. Elle est relue dans les bilans des semaines 3 et 6.
 
 ## Bibliothèque
 
