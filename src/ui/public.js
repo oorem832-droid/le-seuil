@@ -42,7 +42,7 @@ export function footer(){
      <button class="f" data-go="accessibilite">Accessibilité</button><button class="f" data-go="protection">Protection et orientation</button></div></div>
     <div><h4>Contact</h4><div class="stack small" style="gap:6px;opacity:.9">
      <span><a href="mailto:leseuil@orejeen.com" style="color:inherit">leseuil@orejeen.com</a></span><span>Lun–ven 8 h–18 h · sam 8 h–13 h</span>
-     <span>Facebook · Instagram · LinkedIn · YouTube <em>(comptes à créer)</em></span></div></div>
+     <span><a href="https://www.youtube.com/@leseuildigital?sub_confirmation=1" target="_blank" rel="noopener" style="color:inherit;font-weight:600">YouTube · @leseuildigital</a></span></div></div>
    </div>
    <div class="disclaimer"><b>LE SEUIL n’est pas un service d’urgence.</b> Nous proposons de l’information et des programmes d’auto-assistance, ni diagnostic, ni psychothérapie, ni prise en charge psychiatrique. Si vous ou un proche êtes en danger : SAMU 185, sapeurs-pompiers 180, police 170, 110 ou 111, ou rendez-vous aux urgences de l’hôpital le plus proche.</div>
    <div class="base"><span>© 2026 LE SEUIL${DEMO?" · Maquette de démonstration":""}</span><span>Franchir le seuil, et soudain, vous n’êtes plus seul.</span></div>
