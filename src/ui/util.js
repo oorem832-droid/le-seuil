@@ -63,16 +63,20 @@ export const LOGO = import.meta.env.VITE_LOGO_URL || BASE + "logo.jpg";
 export const MARK = import.meta.env.VITE_MARK_URL || BASE + "mark.jpg";
 export const $$ = s => [...document.querySelectorAll(s)];
 
+import { isEn } from "../i18n.js";
+const EN_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const FR_MONTHS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
 export function fmtDate(d, withTime=false){
   if (!d) return "";
   const x = new Date(d);
   if (isNaN(x)) return String(d);
+  const hh = String(x.getHours()).padStart(2,"0"), mm = String(x.getMinutes()).padStart(2,"0");
+  if (isEn()) { const e = `${x.getDate()} ${EN_MONTHS[x.getMonth()]} ${x.getFullYear()}`; return withTime ? `${e} at ${hh}:${mm}` : e; }
   const s = `${x.getDate()} ${FR_MONTHS[x.getMonth()]} ${x.getFullYear()}`;
-  return withTime ? `${s} à ${String(x.getHours()).padStart(2,"0")} h ${String(x.getMinutes()).padStart(2,"0")}` : s;
+  return withTime ? `${s} à ${hh} h ${mm}` : s;
 }
-export const fmtShort = d => { const x = new Date(d); return isNaN(x) ? "" : x.toLocaleDateString("fr-FR",{day:"numeric",month:"short"}); };
-export const fmtTime = d => { const x = new Date(d); return isNaN(x) ? "" : `${String(x.getHours()).padStart(2,"0")} h ${String(x.getMinutes()).padStart(2,"0")}`; };
+export const fmtShort = d => { const x = new Date(d); return isNaN(x) ? "" : x.toLocaleDateString(isEn() ? "en-GB" : "fr-FR",{day:"numeric",month:"short"}); };
+export const fmtTime = d => { const x = new Date(d); if (isNaN(x)) return ""; const hh = String(x.getHours()).padStart(2,"0"), mm = String(x.getMinutes()).padStart(2,"0"); return isEn() ? `${hh}:${mm}` : `${hh} h ${mm}`; };
 export const fcfa = n => `${Number(n).toLocaleString("fr-FR").replace(/ | /g," ")} FCFA`;
 
 /* Blocs de leçon : {t:'p'|'ul'|'ol'|'h', text|items} */
