@@ -27,6 +27,7 @@ export function playerHTML(url, title, captions, autoplay){
       <button type="button" class="yt-btn" data-yt-toggle aria-label="Lecture">${ic.play}</button>
       <input class="yt-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Position dans la vidéo">
       <span class="yt-time">0:00</span>
+      <button type="button" class="yt-btn yt-cc" data-yt-cc aria-pressed="false" aria-label="Sous-titres en français"><span aria-hidden="true">CC</span></button>
       <button type="button" class="yt-btn" data-yt-mute aria-label="Couper le son">${ic.vol}</button>
       <button type="button" class="yt-btn" data-yt-full aria-label="Plein écran">${ic.full}</button>
     </div></div>`;
@@ -55,7 +56,8 @@ async function setup(box){
   const holder = box.querySelector(".yt-frame");
   const seek = box.querySelector(".yt-seek"), time = box.querySelector(".yt-time");
   const toggles = box.querySelectorAll("[data-yt-toggle]"), playBtn = box.querySelector(".yt-btn[data-yt-toggle]");
-  const muteBtn = box.querySelector("[data-yt-mute]"), fullBtn = box.querySelector("[data-yt-full]");
+  const muteBtn = box.querySelector("[data-yt-mute]"), fullBtn = box.querySelector("[data-yt-full]"), ccBtn = box.querySelector("[data-yt-cc]");
+  let ccOn = false;
   let timer = null, dragging = false;
   const player = new YT.Player(holder, {
     host: "https://www.youtube-nocookie.com",
@@ -86,6 +88,14 @@ async function setup(box){
   seek.addEventListener("input", () => { dragging = true; const d = player.getDuration?.() || 0; time.textContent = `${fmt(seek.value / 1000 * d)} / ${fmt(d)}`; });
   seek.addEventListener("change", () => { const d = player.getDuration?.() || 0; player.seekTo(seek.value / 1000 * d, true); dragging = false; });
   muteBtn.addEventListener("click", () => { if (player.isMuted()) { player.unMute(); muteBtn.innerHTML = ic.vol; muteBtn.setAttribute("aria-label", "Couper le son"); } else { player.mute(); muteBtn.innerHTML = ic.mute; muteBtn.setAttribute("aria-label", "Activer le son"); } });
+  ccBtn.addEventListener("click", () => {
+    ccOn = !ccOn;
+    try {
+      if (ccOn) { player.loadModule("captions"); player.setOption("captions", "track", { languageCode: "fr" }); }
+      else player.unloadModule("captions");
+    } catch(e) {}
+    ccBtn.setAttribute("aria-pressed", String(ccOn)); ccBtn.classList.toggle("on", ccOn);
+  });
   fullBtn.addEventListener("click", () => { if (document.fullscreenElement) document.exitFullscreen?.(); else (box.requestFullscreen || box.webkitRequestFullscreen)?.call(box); });
 }
 

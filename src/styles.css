@@ -489,15 +489,19 @@ table.parts th,table.parts td{padding-left:10px;padding-right:10px}
 /* Home page welcome video */
 .welcome-video{padding-top:clamp(8px,2vw,24px)}
 .welcome-video .wv-head{max-width:720px;margin:0 auto 22px;text-align:center;align-items:center}
-.yt{position:relative;max-width:980px;margin:0 auto;aspect-ratio:16/9;border-radius:var(--r-lg);overflow:hidden;background:var(--beige);box-shadow:var(--shadow);border:1px solid var(--line);-webkit-user-select:none;user-select:none}
+.yt{position:relative;max-width:780px;margin:0 auto;aspect-ratio:16/9;border-radius:var(--r-lg);overflow:hidden;background:var(--beige);box-shadow:var(--shadow);border:1px solid var(--line);-webkit-user-select:none;user-select:none}
 .yt .vid-yt{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:auto;border-radius:0;margin:0}
 .yt-poster{position:absolute;inset:0;width:100%;height:100%;padding:0;border:0;background:none;cursor:pointer;display:block}
 .yt-poster img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;-webkit-user-drag:none;transition:transform .5s ease}
 .yt-poster:hover img{transform:scale(1.02)}
-.yt-play{position:absolute;left:50%;top:50%;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;background:var(--forest);color:#fff;display:grid;place-items:center;box-shadow:0 10px 30px #1f2b2259;transition:transform .2s ease}
+.yt-play{position:absolute;left:50%;top:50%;width:68px;height:68px;margin:-34px 0 0 -34px;border-radius:50%;background:var(--forest);color:#fff;display:grid;place-items:center;box-shadow:0 10px 30px #1f2b2259;transition:transform .2s ease}
 .yt-play svg{margin-left:4px}
 .yt-poster:hover .yt-play,.yt-poster:focus-visible .yt-play{transform:scale(1.08)}
 .yt-poster:focus-visible{outline:3px solid var(--gold);outline-offset:-3px}
 .yt-dur{position:absolute;right:14px;bottom:14px;background:#1f2b22d9;color:#fff;font-size:.8rem;font-weight:700;padding:4px 10px;border-radius:999px}
 .wv-note{text-align:center;margin-top:12px}
 @media (prefers-reduced-motion:reduce){.yt-poster img,.yt-play{transition:none}}
+.wv-cta{display:flex;justify-content:center;margin-top:16px}
+.welcome-video h2{margin:0}
+.yt-cc span{font:700 .72rem/1 var(--font-body,inherit);letter-spacing:.04em;border:1.6px solid currentColor;border-radius:4px;padding:3px 4px}
+.yt-cc.on span{background:#fff;color:#1f2b22}

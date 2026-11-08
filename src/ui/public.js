@@ -55,17 +55,18 @@ const WELCOME_VIDEO = "https://youtu.be/E8L7NNa76L4";
 function welcomeVideo(){
   const en = lang() === "en";
   return `<section class="section welcome-video" aria-labelledby="wv-title"><div class="wrap">
-   <div class="wv-head stack" style="gap:8px"><span class="eyebrow">Bienvenue</span>
-    <h2 id="wv-title">Découvrir LE SEUIL en quelques minutes</h2>
-    <p class="muted">Judie Ore, fondatrice de LE SEUIL, vous présente la plateforme : la Bibliothèque gratuite, les programmes de six semaines et la façon dont nous pouvons vous accompagner.</p></div>
+   <div class="wv-head stack" style="gap:8px">
+    <h2 id="wv-title">Bienvenue sur LE SEUIL</h2>
+    <p class="muted">Prenez quelques instants pour découvrir notre approche du bien-être psychologique et les ressources mises à votre disposition.</p></div>
    <div class="yt" id="welcome-yt">
     <button class="yt-poster" data-act="play-welcome" aria-label="Lire la vidéo de bienvenue">
-     <img src="welcome-${en ? "en" : "fr"}.jpg" alt="" width="1280" height="720" loading="lazy" draggable="false">
-     <span class="yt-play" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+     <img src="welcome-${en ? "en" : "fr"}.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async" draggable="false">
+     <span class="yt-play" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
      <span class="yt-dur">1:34</span>
     </button>
    </div>
-   ${en ? '<p class="small muted wv-note" data-noi18n>Video in French, with French subtitles.</p>' : ""}
+   ${en ? '<p class="small muted wv-note" data-noi18n>Video in French, with French subtitles available.</p>' : ""}
+   <div class="wv-cta"><button class="btn btn-soft btn-sm" data-go="programmes">Découvrir nos programmes ${icon("arrow")}</button></div>
   </div></section>`;
 }
 actions["play-welcome"] = () => {
