@@ -7,6 +7,7 @@ import { ui, actions, forms, inputs, rerender, go } from "./state.js";
 import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
 import { lang } from "../i18n.js";
+import { playerHTML } from "./video.js";
 
 export const NAV = [["accueil","Accueil"],["apropos","À propos"],["bibliotheque","Bibliothèque"],["programmes","Nos programmes"],["contact","Contact"]];
 const navActive = (r) => r.startsWith("article-") || r.startsWith("bibliotheque") ? "bibliotheque" : r.startsWith("programme-") ? "programmes" : r === "decouvrir" ? "apropos" : r;
@@ -49,6 +50,29 @@ export function footer(){
   </div></footer>`;
 }
 
+// Welcome video on the home page (YouTube, played with the protected player after a click on the poster).
+const WELCOME_VIDEO = "https://youtu.be/E8L7NNa76L4";
+function welcomeVideo(){
+  const en = lang() === "en";
+  return `<section class="section welcome-video" aria-labelledby="wv-title"><div class="wrap">
+   <div class="wv-head stack" style="gap:8px"><span class="eyebrow">Bienvenue</span>
+    <h2 id="wv-title">Découvrir LE SEUIL en quelques minutes</h2>
+    <p class="muted">Judie Ore, fondatrice de LE SEUIL, vous présente la plateforme : la Bibliothèque gratuite, les programmes de six semaines et la façon dont nous pouvons vous accompagner.</p></div>
+   <div class="yt" id="welcome-yt">
+    <button class="yt-poster" data-act="play-welcome" aria-label="Lire la vidéo de bienvenue">
+     <img src="welcome-${en ? "en" : "fr"}.jpg" alt="" width="1280" height="720" loading="lazy" draggable="false">
+     <span class="yt-play" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+     <span class="yt-dur">1:34</span>
+    </button>
+   </div>
+   ${en ? '<p class="small muted wv-note" data-noi18n>Video in French, with French subtitles.</p>' : ""}
+  </div></section>`;
+}
+actions["play-welcome"] = () => {
+  const box = document.getElementById("welcome-yt");
+  if (box) { box.innerHTML = playerHTML(WELCOME_VIDEO, "LE SEUIL", null, true); box.classList.add("yt-live"); }
+};
+
 export function pHome(){
   const arts = featuredArticles();
   return `
@@ -62,6 +86,8 @@ export function pHome(){
    </div>
    ${HERO_ART}
   </div></section>
+
+  ${welcomeVideo()}
 
   <section class="section"><div class="wrap">
    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:48px;align-items:start">

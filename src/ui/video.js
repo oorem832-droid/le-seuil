@@ -18,9 +18,9 @@ const ic = {
   full: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
 };
 
-export function playerHTML(url, title, captions){
+export function playerHTML(url, title, captions, autoplay){
   const yt = youtubeId(url);
-  if (yt) return `<div class="vid vid-yt" data-yt="${yt}">
+  if (yt) return `<div class="vid vid-yt" data-yt="${yt}"${autoplay ? " data-autoplay=\"1\"" : ""}>
     <div class="yt-frame"></div>
     <div class="yt-shield" data-yt-toggle role="presentation"><span class="yt-big">${ic.play}</span></div>
     <div class="yt-bar">
@@ -62,6 +62,7 @@ async function setup(box){
     videoId: box.dataset.yt,
     playerVars: { controls: 0, disablekb: 1, fs: 0, rel: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, cc_load_policy: 0, hl: document.documentElement.lang || "fr", origin: location.origin },
     events: {
+      onReady: () => { if (box.dataset.autoplay) player.playVideo(); },
       onStateChange: e => {
         const playing = e.data === YT.PlayerState.PLAYING;
         box.classList.toggle("playing", playing);
