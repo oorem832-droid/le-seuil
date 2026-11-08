@@ -3,6 +3,7 @@ import { SUITABILITY, EMERGENCY, CALM_TOOLS, CALM_NOTE, COACH } from "../content
 import { esc, icon, blocksHTML, fmtDate, fmtShort, fmtTime, toast, $, download, printSection, pageHead } from "./util.js";
 import { ui, actions, forms, inputs, changes, rerender, render, go } from "./state.js";
 import { exerciseHTML, completeStep, summaryText, breathHTML, saveStateHTML, setSaveState, stopBreath } from "./exercises.js";
+import { playerHTML } from "./video.js";
 import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
 
@@ -225,16 +226,9 @@ export function mPlayer(n, i, preview = false){
     </div>
    </section></div>`;
 }
-// YouTube links (including unlisted videos) play inside the page, in privacy-enhanced mode.
-export function youtubeId(url){
-  const m = String(url || "").match(/(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-  return m ? m[1] : null;
-}
 function videoHTML(s){
   const c = s.content || {};
-  const yt = youtubeId(c.url);
-  const player = yt ? `<div class="vid vid-yt"><iframe src="https://www.youtube-nocookie.com/embed/${yt}?rel=0&modestbranding=1&playsinline=1&hl=fr&cc_lang_pref=fr" title="${esc(s.title)}" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`
-    : c.url ? `<video class="vid" controls preload="metadata" src="${esc(c.url)}">${c.captions_url?`<track kind="captions" srclang="fr" label="Français" src="${esc(c.captions_url)}" default>`:""}</video>`
+  const player = c.url ? playerHTML(c.url, s.title, c.captions_url)
     : `<div class="video"><div><div class="play">${icon("play")}</div><b>${esc(s.title)}</b><div class="small">Vidéo en cours de production${c.duration?` · environ ${esc(c.duration)}`:""}</div></div></div>`;
   return `${player}${c.transcript ? `<details class="transcript" ${c.url?"":"open"}><summary>Transcription${c.url?"":" (version écrite)"}</summary><div class="prose"><p>${esc(c.transcript)}</p></div></details>` : ""}`;
 }
