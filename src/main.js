@@ -10,6 +10,7 @@ import * as PG from "./ui/programmes.js";
 import * as store from "./store.js";
 import { S, C } from "./store.js";
 import { stopBreath } from "./ui/exercises.js";
+import { startI18n, setLang, lang, frOnly } from "./i18n.js";
 
 // Retour d'un lien d'accès (invitation / réinitialisation) : Supabase lit les jetons dans l'URL.
 const AUTH_HASH = /access_token=|error_description=|type=(invite|recovery)/.test(location.hash);
@@ -93,7 +94,11 @@ function render(navigated = false){
   const robots = document.querySelector('meta[name="robots"]');
   if (robots) robots.content = PRIVATE.test(current) ? "noindex, nofollow" : "index, follow";
   const html = page(current);
-  $("#app").innerHTML = P.header() + `<main id="main" tabindex="-1">${html}</main>` + P.footer();
+  // Team area stays in French; content that only exists in French gets a short note in English mode.
+  const teamArea = /^(accompagnante|admin|apercu|verification)/.test(ui.route);
+  const note = /^article-/.test(ui.route) ? frOnly("article") : /^bibliotheque/.test(ui.route) ? frOnly("library")
+    : /^(semaine-|lecons|exercices|programme-)/.test(ui.route) ? frOnly("programme") : "";
+  $("#app").innerHTML = P.header() + `<main id="main" tabindex="-1"${teamArea ? " data-noi18n" : ""}>${note ? `<div class="wrap lang-note-wrap">${note}</div>` : ""}${html}</main>` + P.footer();
   if (navigated) {
     window.scrollTo(0, 0);
     ui.missing = {}; ui.confirm = null;
@@ -109,6 +114,7 @@ function rerender(){
 hooks.render = render; hooks.rerender = rerender; hooks.go = go;
 
 /* ---------- Délégation d'événements ---------- */
+actions["lang"] = () => { setLang(lang() === "en" ? "fr" : "en"); location.reload(); };
 actions["burger"] = (b) => { const n = $("#mainnav"); n.classList.toggle("open"); b.setAttribute("aria-expanded", n.classList.contains("open")); };
 const guard = (fn) => async (...a) => { try { await fn(...a); } catch(e) { console.error(e); toast("Une erreur est survenue. Vérifiez votre connexion et réessayez."); } };
 
@@ -131,6 +137,7 @@ store.onEvent((evt) => {
   ST.dropStaff();
   render(false);
 });
+startI18n();
 $("#app").innerHTML = `<div class="boot"><p class="muted">Chargement…</p></div>`;
 store.boot().catch(err => { console.error(err); toast("Connexion au service impossible. Certains contenus peuvent manquer."); }).finally(() => {
   if (AUTH_HASH) { try { history.replaceState(null, "", location.pathname + "#premier-acces"); } catch (e) {} if (AUTH_ERROR && !S.user) toast("Ce lien a expiré ou a déjà été utilisé."); }

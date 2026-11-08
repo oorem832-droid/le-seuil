@@ -6,6 +6,7 @@ import { esc, icon, cover, HERO_ART, LOGO, MARK, pageHead, fmtDate, fcfa, toast,
 import { ui, actions, forms, inputs, rerender, go } from "./state.js";
 import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
+import { lang } from "../i18n.js";
 
 export const NAV = [["accueil","Accueil"],["apropos","À propos"],["bibliotheque","Bibliothèque"],["programmes","Nos programmes"],["contact","Contact"]];
 const navActive = (r) => r.startsWith("article-") || r.startsWith("bibliotheque") ? "bibliotheque" : r.startsWith("programme-") ? "programmes" : r === "decouvrir" ? "apropos" : r;
@@ -21,6 +22,7 @@ export function header(){
    <button class="brand" data-go="accueil" aria-label="LE SEUIL, accueil"><img src="${MARK}" alt=""><span>LE SEUIL</span></button>
    <nav class="main" id="mainnav" aria-label="Navigation principale">${NAV.map(([k,l])=>`<button data-go="${k}" ${a===k?'aria-current="page"':""}>${l}</button>`).join("")}</nav>
    <div class="head-cta">
+    <button class="btn btn-soft btn-sm lang-btn" data-act="lang" data-noi18n lang="${lang() === "en" ? "fr" : "en"}" aria-label="${lang() === "en" ? "Version française" : "English version"}"><span aria-hidden="true">${lang() === "en" ? "FR" : "EN"}</span></button>
     <button class="btn btn-primary btn-sm" data-go="${homeRoute()}">${icon("user")}${who}</button>
    </div>
    <button class="btn btn-soft btn-sm burger" data-act="burger" aria-controls="mainnav" aria-expanded="false" aria-label="Menu">${icon("menu")}</button>
@@ -39,7 +41,7 @@ export function footer(){
      <button class="f" data-go="confidentialite">Confidentialité</button><button class="f" data-go="conditions">Conditions d’utilisation</button>
      <button class="f" data-go="accessibilite">Accessibilité</button><button class="f" data-go="protection">Protection et orientation</button></div></div>
     <div><h4>Contact</h4><div class="stack small" style="gap:6px;opacity:.9">
-     <span>contact@leseuil.ci <em>(adresse à confirmer)</em></span><span>Lun–ven 8 h–18 h · sam 8 h–13 h</span>
+     <span><a href="mailto:leseuil@orejeen.com" style="color:inherit">leseuil@orejeen.com</a></span><span>Lun–ven 8 h–18 h · sam 8 h–13 h</span>
      <span>Facebook · Instagram · LinkedIn · YouTube <em>(comptes à créer)</em></span></div></div>
    </div>
    <div class="disclaimer"><b>LE SEUIL n’est pas un service d’urgence.</b> Nous proposons de l’information et des programmes d’auto-assistance, ni diagnostic, ni psychothérapie, ni prise en charge psychiatrique. Si vous ou un proche êtes en danger : SAMU 185, sapeurs-pompiers 180, police 170, 110 ou 111, ou rendez-vous aux urgences de l’hôpital le plus proche.</div>
@@ -151,7 +153,7 @@ export function pContact(){
    </form>
    <aside class="aside">
     <div class="notice">${icon("phone")}<span><b>Ce formulaire n’est pas suivi en temps réel.</b> En cas d’urgence, appelez le SAMU au 185.</span></div>
-    <div class="card-flat stack" style="gap:8px"><h4>Coordonnées</h4><p class="small">contact@leseuil.ci <em class="muted">(à confirmer)</em></p><p class="small">Abidjan, Côte d’Ivoire</p><p class="small muted">Lundi au vendredi 8 h–18 h<br>Samedi 8 h–13 h</p></div>
+    <div class="card-flat stack" style="gap:8px"><h4>Coordonnées</h4><p class="small"><a href="mailto:leseuil@orejeen.com">leseuil@orejeen.com</a></p><p class="small">Abidjan, Côte d’Ivoire</p><p class="small muted">Lundi au vendredi 8 h–18 h<br>Samedi 8 h–13 h</p></div>
    </aside>
   </div></section>`;
 }

@@ -462,3 +462,8 @@ details > summary.h-sub{cursor:pointer}
 .nowrap{white-space:nowrap}
 .plan-chip span{overflow-wrap:anywhere;font-size:.82rem}
 table.parts th,table.parts td{padding-left:10px;padding-right:10px}
+
+/* Language switch and "French only" note */
+.lang-btn{min-width:44px;font-weight:700;letter-spacing:.04em}
+.lang-note-wrap{padding-top:18px}
+.lang-note{margin:0;padding:10px 14px;border-radius:12px;background:var(--beige);color:var(--forest);font-size:.92rem;border:1px solid rgba(0,0,0,.06)}
