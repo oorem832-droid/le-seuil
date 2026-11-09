@@ -1,11 +1,12 @@
 // « Nos programmes » : présentation publique uniquement. Aucune leçon, aucun script vidéo, aucun exercice
 // détaillé ni questionnaire n'est affiché ici. Le visiteur envoie une demande ; il ne crée pas de compte.
 import { esc, icon, cover, pageHead, fcfa, toast, $ } from "./util.js";
-import { ui, actions, forms, rerender, go } from "./state.js";
+import { ui, actions, forms, changes, rerender, go } from "./state.js";
 import { C, DEMO, api } from "../store.js";
 import * as store from "../store.js";
 import { gateOn, screened } from "./orientation.js";
-import { CATALOGUE_SIZE, EVALUATION_QUESTIONS, EVALUATION_NOTICE } from "../content.js";
+import { CATALOGUE_SIZE, EVALUATION_QUESTIONS, EVALUATION_NOTICE, EMERGENCY } from "../content.js";
+import { SECTIONS, WSAS_LEGEND, fieldVisible, scores, attention, ageFrom } from "../assessment.js";
 import { publishedArticles, articleCard, catSlug } from "./library.js";
 
 const visible = () => C.programmes.filter(p => ["demo", "published"].includes(p.status)).sort((a, b) => (a.sort || 0) - (b.sort || 0));
@@ -77,7 +78,146 @@ export function pProgramme(slug){
      <a class="btn btn-ghost" href="#bibliotheque-${catSlug((p.library_categories || [])[0] || "")}" data-go="${(p.library_categories || []).length ? "bibliotheque-" + catSlug(p.library_categories[0]) : "bibliotheque"}" style="align-self:flex-start">Explorer la Bibliothèque</a></div></section>` : ""}`;
 }
 
+/* Pré-évaluation détaillée : désactivée tant que les validations juridiques et professionnelles ne sont pas faites
+   (feature flag « pre_evaluation »). Sinon, le formulaire simple existant est utilisé. */
+const asmOn = () => !!C.flags?.pre_evaluation;
+const secs = () => SECTIONS.filter(s => !s.flag || C.flags?.[s.flag]);
+const activeFields = () => secs().flatMap(s => s.fields);
 function requestForm(p, sel){
+  if (!asmOn() && ui.reqSent !== p.slug) return requestFormSimple(p, sel);
+  if (ui.reqSent === p.slug) return `<div class="card stack" role="status"><h2 class="h-sub">${icon("check")} Votre demande a bien été transmise</h2>
+    <p>Merci d’avoir pris le temps de répondre. L’équipe LE SEUIL va examiner votre pré-évaluation et l’adéquation du programme à votre situation, puis vous recontactera pour un court échange et la suite (notamment le paiement).</p>
+    ${ui.reqCare ? careHTML(ui.reqCare === "urgent") : ""}
+    <p class="small muted">Aucun compte n’a été créé. Votre accès vous sera envoyé par e-mail une fois votre demande validée.</p>
+    <p class="small muted">${icon("phone")} ${esc(EVALUATION_NOTICE)}</p>
+    <button class="btn btn-soft btn-sm" data-act="req-again" style="align-self:flex-start">Faire une autre demande</button></div>`;
+  const S_ = secs(), d = ui.asm || (ui.asm = {}), step = Math.min(ui.asmStep || 0, S_.length - 1), n = S_.length;
+  return `<form class="card stack asm" id="requestform" novalidate aria-labelledby="req-h">
+   <div class="stack" style="gap:6px"><h2 class="h-sub" id="req-h">Demande d’inscription · pré-évaluation</h2>
+   <p class="small muted">Environ 10 à 15 minutes. Vos réponses sont confidentielles et lues uniquement par l’équipe LE SEUIL pour vérifier que le programme vous convient et préparer votre accompagnement. Ce n’est pas un diagnostic. Vous restez libre de votre programme, de votre formule et du moment de votre inscription. Les questions marquées * sont obligatoires.</p></div>
+   <input type="hidden" id="rq-prog" value="${esc(p.slug)}">
+   <ol class="asm-steps" aria-label="Étapes">${S_.map((s, i) => `<li class="${i === step ? "on" : i < step ? "done" : ""}"${i === step ? ' aria-current="step"' : ""}><span>${i + 1}</span><em>${esc(s.title)}</em></li>`).join("")}</ol>
+   <p class="small muted asm-count">Étape ${step + 1} sur ${n}</p>
+   ${S_.map((s, i) => `<fieldset class="stack asm-sec" data-sec="${i}"${i === step ? "" : " hidden"}><legend class="h-card">${esc(s.title)}</legend>
+     ${s.intro ? `<p class="small muted">${esc(s.intro)}</p>` : ""}
+     ${s.id === "securite" ? `<div class="notice" role="note">${icon("phone")}<span>Si vous êtes en danger immédiat, n’attendez pas : appelez le SAMU au 185 ou rendez-vous aux urgences les plus proches.</span></div>` : ""}
+     <div class="asm-grid">${s.fields.map(f => fieldHTML(f, d)).join("")}</div>
+     ${s.id === "securite" ? `<div id="asm-care" aria-live="polite">${attention(d).care ? careHTML(attention(d).urgent) : ""}</div>` : ""}
+     ${s.id === "envoi" ? envoiHTML(p, sel, d) : ""}
+   </fieldset>`).join("")}
+   <p id="rq-out" class="small" role="status"></p>
+   <div class="row asm-nav"${attention(d).urgent ? " hidden" : ""}>${step > 0 ? `<button type="button" class="btn btn-soft" data-act="asm-prev">Précédent</button>` : ""}
+    ${step < n - 1 ? `<button type="button" class="btn btn-primary" data-act="asm-next">Suivant ${icon("arrow")}</button>` : `<button class="btn btn-gold" type="submit">Envoyer ma demande</button>`}</div>
+  </form>`;
+}
+function careHTML(urgent){
+  return `<div class="notice asm-care-box" role="note">${icon("shield")}<div class="stack" style="gap:6px">
+    <b>${urgent ? "Vous méritez de l’aide tout de suite" : "Merci de nous l’avoir dit"}</b>
+    <span>${urgent ? "Dans cette situation, un programme en ligne ne suffit pas. Contactez dès maintenant les services d’urgence ou rendez-vous aux urgences les plus proches et, si possible, demandez à une personne de confiance de rester avec vous. Ce formulaire n’est pas lu en temps réel : l’envoyer ne déclenche aucune intervention. Votre demande d’inscription pourra être faite plus tard."
+      : "Ces pensées peuvent être très lourdes à porter. Nous vous encourageons à en parler rapidement à un professionnel qualifié (médecin, psychologue, psychiatre) ou à une personne de confiance : un programme LE SEUIL ne remplace pas ce soutien. Vous pouvez envoyer votre demande ; elle sera lue dans les délais habituels, sans surveillance en temps réel. Si la situation s’aggrave, contactez les services d’urgence."}</span>
+    <span class="small">Côte d’Ivoire : ${EMERGENCY.map(e => `${esc(e.label)} : <b>${esc(e.num)}</b>`).join(" · ")} · <a href="#besoin-aide" data-go="besoin-aide">Besoin d’aide maintenant ?</a></span></div></div>`;
+}
+function envoiHTML(p, sel, d){
+  const plan = d.plan || sel || "";
+  return `<fieldset class="field"><legend class="flabel">Formule souhaitée *</legend><div class="plan-pick">${C.plans.map(pl => `<label class="pick"><input type="radio" name="a-plan" value="${pl.id}" ${plan === pl.id ? "checked" : ""}><span><b>${esc(pl.short)}</b><span class="small muted">${fcfa(pl.price)}</span></span></label>`).join("")}</div></fieldset>
+   <div class="field"><label class="flabel" for="a-message">Autre chose à nous dire ? (facultatif)</label><textarea id="a-message" name="a-message" rows="3" maxlength="2000">${esc(d.message || "")}</textarea></div>
+   <label class="check"><input name="a-is_adult" type="checkbox" ${d.is_adult ? "checked" : ""}><span>J’ai 18 ans ou plus. *</span></label>
+   <label class="check"><input name="a-consent" type="checkbox" ${d.consent ? "checked" : ""}><span>J’accepte que ces informations, y compris celles sur ma santé, soient utilisées par l’équipe LE SEUIL uniquement pour évaluer ma demande et m’accompagner (voir la <a href="#confidentialite" data-go="confidentialite">politique de confidentialité</a>). *</span></label>
+   <label class="check"><input name="a-contact_ok" type="checkbox" ${d.contact_ok ? "checked" : ""}><span>J’accepte d’être recontacté·e par téléphone ou WhatsApp au sujet de ma demande.</span></label>`;
+}
+function fieldHTML(f, d){
+  const id = "a-" + f.k, v = d[f.k], req = f.req ? " *" : "", hid = fieldVisible(f, d) ? "" : " hidden";
+  const wrap = (inner, cls = "") => `<div class="field asm-f${f.half ? " half" : ""}${cls}" data-k="${f.k}"${hid}>${inner}</div>`;
+  if (f.type === "heading") return `<h3 class="h-sub asm-h">${esc(f.label)}</h3>`;
+  if (f.type === "radio" || f.type === "scale") {
+    const opts = f.type === "scale" ? f.options : f.options.map(o => [o, o]);
+    const all = f.extra ? [...opts, f.extra] : opts;
+    return `<fieldset class="field asm-f${f.type === "scale" ? " asm-scale" : ""}" data-k="${f.k}"${hid}><legend class="flabel">${esc(f.label)}${req}</legend>
+      <div class="asm-opts">${all.map(([val, lab]) => `<label class="asm-opt${val === "na" ? " wide" : ""}"><input type="radio" name="${id}" value="${esc(val)}" ${v === val ? "checked" : ""}><span>${esc(lab)}</span></label>`).join("")}</div>${f.type === "scale" ? `<p class="asm-legend small muted">${WSAS_LEGEND.map(esc).join(" · ")}</p>` : ""}</fieldset>`;
+  }
+  if (f.type === "checks") return `<fieldset class="field asm-f" data-k="${f.k}"${hid}><legend class="flabel">${esc(f.label)}${req}</legend>
+      <div class="asm-opts">${f.options.map(o => `<label class="asm-opt"><input type="checkbox" name="${id}" value="${esc(o)}" ${(v || []).includes(o) ? "checked" : ""}><span>${esc(o)}</span></label>`).join("")}</div></fieldset>`;
+  const lab = `<label class="flabel" for="${id}">${esc(f.label)}${req}</label>`;
+  if (f.type === "select") return wrap(`${lab}<select id="${id}" name="${id}"><option value="">Choisir…</option>${f.options.map(o => `<option ${v === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`);
+  if (f.type === "textarea") return wrap(`${lab}<textarea id="${id}" name="${id}" rows="3" maxlength="2000"${f.ph ? ` placeholder="${esc(f.ph)}"` : ""}>${esc(v || "")}</textarea>`);
+  const max = f.type === "date" ? ` max="${new Date().toISOString().slice(0, 10)}" min="1900-01-01"` : ` maxlength="${f.type === "email" ? 320 : 200}"`;
+  return wrap(`${lab}<input id="${id}" name="${id}" type="${f.type}"${f.ac ? ` autocomplete="${f.ac}"` : ""}${max}${f.ph ? ` placeholder="${esc(f.ph)}"` : ""} value="${esc(v || "")}">`);
+}
+/* Lit le formulaire dans ui.asm (gardé en mémoire uniquement, jamais dans le navigateur). */
+function readAsm(){
+  const f = document.getElementById("requestform"); if (!f) return ui.asm || {};
+  const d = ui.asm || (ui.asm = {});
+  for (const x of activeFields()) {
+    if (x.type === "heading") continue;
+    const nm = "a-" + x.k;
+    if (x.type === "radio" || x.type === "scale") { const c = f.querySelector(`input[name="${nm}"]:checked`); if (c) d[x.k] = c.value; else delete d[x.k]; }
+    else if (x.type === "checks") d[x.k] = [...f.querySelectorAll(`input[name="${nm}"]:checked`)].map(c => c.value);
+    else { const el = f.elements[nm]; if (el) d[x.k] = el.value.trim(); }
+  }
+  const pl = f.querySelector('input[name="a-plan"]:checked'); if (pl) d.plan = pl.value;
+  if (f.elements["a-message"]) d.message = f.elements["a-message"].value.trim();
+  for (const k of ["is_adult", "consent", "contact_ok"]) { const el = f.elements["a-" + k]; if (el) d[k] = el.checked; }
+  return d;
+}
+function stepError(i, d){
+  const s = secs()[i];
+  const miss = s.fields.find(f => f.req && f.type !== "heading" && fieldVisible(f, d) && (Array.isArray(d[f.k]) ? !d[f.k].length : !d[f.k]));
+  if (miss) return { msg: `Merci de répondre à : « ${miss.label} »`, k: miss.k };
+  if (s.id === "coord") {
+    if (!/^\S+@\S+\.\S+$/.test(d.email || "")) return { msg: "Merci d’indiquer un e-mail valide.", k: "email" };
+    const age = ageFrom(d.date_naissance);
+    if (age == null || age > 110) return { msg: "Merci de vérifier votre date de naissance.", k: "date_naissance" };
+    if (age < 18) return { msg: "Les programmes LE SEUIL s’adressent aux adultes de 18 ans et plus. Si vous avez besoin d’aide, parlez-en à un adulte de confiance ou à un professionnel de santé.", k: "date_naissance" };
+  }
+  if (s.id === "securite" && attention(d).urgent) return { msg: "Dans cette situation, un programme en ligne ne suffit pas. Contactez dès maintenant les services d’urgence (numéros ci-dessus)." };
+  if (s.id === "envoi") {
+    if (!d.plan) return { msg: "Choisissez une formule." };
+    if (!d.is_adult) return { msg: "Les programmes s’adressent aux adultes de 18 ans et plus." };
+    if (!d.consent) return { msg: "Merci d’accepter l’utilisation de vos informations pour traiter votre demande." };
+  }
+  return null;
+}
+function showErr(e){
+  const el = $("#rq-out"); el.textContent = e.msg; el.style.color = "var(--warn-fg)";
+  const t = e.k && document.querySelector(`#requestform [data-k="${e.k}"]`);
+  if (t) { t.classList.add("asm-miss"); t.scrollIntoView({ behavior: "smooth", block: "center" }); t.querySelector("input,select,textarea")?.focus({ preventScroll: true }); }
+}
+function goStep(i){
+  ui.asmStep = i; rerender();
+  setTimeout(() => { const f = document.getElementById("requestform"); f?.scrollIntoView({ behavior: "smooth", block: "start" }); f?.querySelector(`[data-sec="${i}"] input, [data-sec="${i}"] textarea, [data-sec="${i}"] select`)?.focus({ preventScroll: true }); }, 40);
+}
+actions["asm-next"] = () => { const d = readAsm(), i = ui.asmStep || 0, e = stepError(i, d); if (e) return showErr(e); goStep(i + 1); };
+actions["asm-prev"] = () => { readAsm(); goStep(Math.max(0, (ui.asmStep || 0) - 1)); };
+changes.push((t) => {
+  const f = t.closest?.("#requestform"); if (!f) return false;
+  const d = readAsm();
+  f.querySelectorAll(".asm-f[data-k]").forEach(el => { const x = activeFields().find(y => y.k === el.dataset.k); if (x) el.hidden = !fieldVisible(x, d); });
+  t.closest(".asm-miss")?.classList.remove("asm-miss");
+  const care = document.getElementById("asm-care");
+  if (care) { const a = attention(d); const was = care.dataset.state || ""; const now = a.urgent ? "urgent" : a.care ? "care" : "";
+    if (was !== now) { care.dataset.state = now; care.innerHTML = now ? careHTML(now === "urgent") : ""; }
+    const nav = f.querySelector(".asm-nav"); if (nav) nav.hidden = a.urgent; }
+  return true;
+});
+
+actions["choose-plan"] = (b) => { const slug = document.getElementById("rq-prog")?.value; if (slug && !screened(slug)) { go("trouver-mon-programme"); return; } if (b.dataset.plan) { ui.reqPlan = b.dataset.plan; (ui.asm || (ui.asm = {})).plan = b.dataset.plan; } rerender(); setTimeout(() => { document.getElementById("demande")?.scrollIntoView({ behavior: "smooth" }); document.querySelector("#requestform input")?.focus({ preventScroll: true }); }, 50); };
+actions["req-again"] = () => { ui.reqSent = null; ui.reqCare = null; rerender(); };
+forms["requestform"] = async (f) => {
+  if (!f.classList.contains("asm")) return submitSimple(f);
+  const d = readAsm();
+  for (let i = 0; i < secs().length; i++) { const e = stepError(i, d); if (e) { if (i !== (ui.asmStep || 0)) { goStep(i); setTimeout(() => showErr(e), 80); } else showErr(e); return; } }
+  const answers = {}; for (const x of activeFields()) if (x.type !== "heading" && fieldVisible(x, d) && d[x.k] !== undefined && d[x.k] !== "" && !(Array.isArray(d[x.k]) && !d[x.k].length)) answers[x.k] = d[x.k];
+  const sc = scores(answers), at = attention(answers);
+  const r = { programme_slug: $("#rq-prog").value, plan: d.plan, first_name: d.first_name, last_name: d.last_name, email: d.email,
+    phone: d.phone || null, message: d.message || null, is_adult: !!d.is_adult, consent: !!d.consent,
+    evaluation: { _v: 2, form_version: "2026-11-09-brouillon", answers, scores: sc, attention: at, contact_ok: !!d.contact_ok, submitted_at: new Date().toISOString() } };
+  const btn = f.querySelector('button[type="submit"]'); btn.disabled = true;
+  try { await api.submitRequest(r); ui.reqSent = r.programme_slug; ui.reqCare = at.urgent ? "urgent" : at.care ? "care" : null; ui.reqPlan = ""; ui.asm = {}; ui.asmStep = 0; rerender(); toast(DEMO ? "Maquette : demande enregistrée dans ce navigateur" : "Demande envoyée"); }
+  catch (e) { console.error(e); const el = $("#rq-out"); el.textContent = "L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez. Vos réponses sont conservées sur cette page."; el.style.color = "var(--warn-fg)"; btn.disabled = false; }
+};
+
+/* ---------- Formulaire simple (en service tant que « pre_evaluation » est désactivé) ---------- */
+function requestFormSimple(p, sel){
   if (ui.reqSent === p.slug) return `<div class="card stack" role="status"><h2 class="h-sub">${icon("check")} Votre demande a bien été transmise</h2>
     <p>Merci. L’équipe LE SEUIL va examiner votre demande et l’adéquation du programme à votre situation. Nous vous recontacterons par e-mail pour la suite, notamment le paiement.</p>
     <p class="small muted">Aucun compte n’a été créé. Votre accès vous sera envoyé par e-mail une fois votre demande validée.</p>
@@ -107,9 +247,7 @@ function requestForm(p, sel){
    <button class="btn btn-gold" type="submit" style="align-self:flex-start">Envoyer ma demande</button><p id="rq-out" class="small" role="status"></p>
   </form>`;
 }
-actions["choose-plan"] = (b) => { const slug = document.getElementById("rq-prog")?.value; if (slug && !screened(slug)) { go("trouver-mon-programme"); return; } if (b.dataset.plan) ui.reqPlan = b.dataset.plan; rerender(); setTimeout(() => { document.getElementById("demande")?.scrollIntoView({ behavior: "smooth" }); document.getElementById("rq-first")?.focus({ preventScroll: true }); }, 50); };
-actions["req-again"] = () => { ui.reqSent = null; rerender(); };
-forms["requestform"] = async (f) => {
+async function submitSimple(f){
   const out = (m) => { const el = $("#rq-out"); el.textContent = m; el.style.color = "var(--warn-fg)"; };
   const plan = f.querySelector('input[name="rq-plan"]:checked')?.value;
   const r = { programme_slug: $("#rq-prog").value, plan, first_name: $("#rq-first").value.trim(), last_name: $("#rq-last").value.trim(), email: $("#rq-mail").value.trim(),
@@ -124,4 +262,4 @@ forms["requestform"] = async (f) => {
   const btn = f.querySelector('button[type="submit"]'); btn.disabled = true;
   try { await api.submitRequest(r); ui.reqSent = r.programme_slug; ui.reqPlan = ""; rerender(); toast(DEMO ? "Maquette : demande enregistrée dans ce navigateur" : "Demande envoyée"); }
   catch (e) { console.error(e); out("L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez."); btn.disabled = false; }
-};
+}

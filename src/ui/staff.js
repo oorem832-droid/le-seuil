@@ -3,6 +3,7 @@
 // des fonctions serveur tracées ; les droits sont vérifiés par la base, pas par l'affichage des boutons.
 // Les journaux personnels des participants ne sont jamais accessibles ici.
 import { esc, icon, fmtDate, fmtShort, fmtTime, toast, $, download } from "./util.js";
+import { assessmentHTML } from "../assessment.js";
 import { ui, actions, forms, changes, inputs, rerender, go } from "./state.js";
 import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
@@ -181,9 +182,10 @@ const REQ = { nouvelle: "Nouvelle demande", en_cours: "En cours d’examen", inf
 function tEval(d) {
   const e = d.evaluation;
   if (!e) return `<p class="muted">Aucune évaluation initiale n’est reliée à ce participant.</p>`;
-  const ans = Object.entries(e.answers || {}).filter(([, v]) => v);
+  const v2 = e.answers?._v === 2;
+  const ans = v2 ? [] : Object.entries(e.answers || {}).filter(([, v]) => v);
   return `<p class="small muted">Évaluation des besoins et de l’adéquation remplie avant l’inscription le ${fmtDate(e.created_at)}. Ce n’est pas un diagnostic.</p>
-   ${ans.length ? `<dl class="facts facts-wide">${ans.map(([k, v]) => `<div><dt>${esc(EVAL[k] || k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : `<p class="muted small">Aucune réponse détaillée.</p>`}
+   ${v2 ? assessmentHTML(e.answers) : ans.length ? `<dl class="facts facts-wide">${ans.map(([k, v]) => `<div><dt>${esc(EVAL[k] || k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : `<p class="muted small">Aucune réponse détaillée.</p>`}
    ${e.message ? `<p class="small"><b>Message :</b> « ${esc(e.message)} »</p>` : ""}
    <h2 class="h-card">Examen et décision</h2>
    ${dl([["Statut de la demande", REQ[e.status] || e.status], ["Résultat de l’examen administratif", esc(e.review_result || "")], ["Décision d’admission ou d’orientation", esc(e.decision_note || "")], ["Examinée le", e.reviewed_at ? fmtDate(e.reviewed_at) : ""]])}`;

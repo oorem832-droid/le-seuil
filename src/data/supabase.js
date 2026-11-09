@@ -209,7 +209,17 @@ export function createSupabaseBackend(url, key) {
     },
     async articleVersions(uuid) { return ok(await sb.from('article_versions').select('id, created_at, snapshot').eq('article_id', uuid).order('created_at', { ascending: false }).limit(20)); },
     // Demandes d'inscription
-    async submitRequest(r) { ok(await sb.from('enrolment_requests').insert(r)); },
+    async submitRequest(r) {
+      const res = await sb.from('enrolment_requests').insert(r);
+      // Colonne « evaluation » absente (migration 20261110 non appliquée) : on garde la demande et on le signale.
+      if (res.error && r.evaluation && /evaluation/.test(res.error.message || '')) {
+        console.error('Pré-évaluation non enregistrée : appliquez la migration 20261110000000_pre_evaluation.sql', res.error);
+        const { evaluation, ...rest } = r;
+        rest.message = ('[Pré-évaluation non enregistrée — à refaire par téléphone] ' + (rest.message || '')).slice(0, 2000);
+        return ok(await sb.from('enrolment_requests').insert(rest));
+      }
+      ok(res);
+    },
     async requests() { return ok(await sb.from('enrolment_requests').select('*').order('created_at', { ascending: false })); },
     async updateRequest(id, patch) { ok(await sb.from('enrolment_requests').update({ ...patch, handled_by: uid }).eq('id', id)); },
     // Participants (fonction serveur pour la création des comptes et l'envoi des accès)

@@ -222,6 +222,8 @@ const FL = [["payments","Paiement en ligne","Après validation juridique et choi
   ["written_support","Accompagnement écrit (forfait 2)","Après validation du cadre, des limites, des délais et de la procédure d’orientation."],
   ["support_calls","Échanges par appels (forfait 3)","Après validation du cadre, des limites, des délais et de la procédure d’orientation."],
   ["orientation","Questionnaire « Trouver mon programme » et parcours de sécurité","Après relecture clinique indépendante du questionnaire et des parcours de sécurité, vérification juridique, tests des scénarios, tests mobile et accessibilité, et vérification des ressources d’aide."],
+  ["pre_evaluation","Pré-évaluation détaillée dans la demande d’inscription","Collecte de données de santé : après vérification juridique (loi n° 2013-450, déclaration éventuelle, hébergement, conservation), relecture professionnelle des questions et des messages de sécurité, et rédaction de la procédure interne. Désactivée : le formulaire simple reste en service."],
+  ["pre_evaluation_scores","Pré-évaluation : module PHQ-9, GAD-7 et WSAS","Après vérification de la source officielle, de la version française validée et des conditions d’utilisation de chaque instrument, et validation de leur finalité. Jamais critère unique d’admission ; scores jamais montrés au participant."],
   ["questionnaires","Questionnaires PHQ-9 / GAD-7 (forfaits 2 et 3)","Après validation de la supervision, des délais de revue, du consentement et de la réponse aux risques. Jamais pour le forfait Autonome."]];
 function aFlags(){
   return shell(`${H("Fonctionnalités", "", "Activez une fonctionnalité uniquement lorsque ses prérequis sont validés. Chaque changement est enregistré dans le journal de traçabilité.")}

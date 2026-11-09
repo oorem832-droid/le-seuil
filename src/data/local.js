@@ -46,7 +46,7 @@ function seed() {
     profiles: PERSONAS.map(p => ({ id: p.id, first_name: p.first_name, last_name: 'Démo', email: p.email, role: p.role, account_status: 'active', must_set_password: false, newsletter_opt_in: false, analytics_opt_in: false, reminders_opt_in: false, created_at: daysFrom(-30) })),
     coach_profiles: [{ user_id: COACH.id, display_name: COACH.name, public_title: COACH.title, bio: COACH.bio, verified: COACH.verified, hours: COACH.hours,
       response_delay: COACH.delay, limits: COACH.limits.join('\n'), active: true, availability: { days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' }, response_hours: 48 }],
-    feature_flags: { payments: false, written_support: true, support_calls: true, questionnaires: false, public_signup: false, orientation: false },
+    feature_flags: { payments: false, written_support: true, support_calls: true, questionnaires: false, public_signup: false, orientation: false, pre_evaluation: false, pre_evaluation_scores: false },
     programmes: progs, programme_weeks: weeks, programme_steps: steps,
     articles: LIBRARY.map(a => ({ id: a.id, slug: a.slug, title: a.title, category: a.category, excerpt: a.chapeau, sections: a.sections, retenir: a.retenir,
       references_list: LIBRARY_REFERENCES, related: LIBRARY.filter(x => x.category === a.category && x.id !== a.id).slice(0, 3).map(x => x.slug),

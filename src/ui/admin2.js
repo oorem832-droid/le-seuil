@@ -6,6 +6,7 @@ import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
 import { CATEGORIES } from "./library.js";
 import { EVALUATION_QUESTIONS } from "../content.js";
+import { assessmentHTML, ageFrom } from "../assessment.js";
 
 const A = ui.admin;
 const PLAN = { autonome: "Formule 1 · Autonome", ecrit: "Formule 2 · Écrit", appels: "Formule 3 · Appels" };
@@ -41,12 +42,14 @@ export function requestsPanel(shell) {
   return shell(`${H("Demandes et évaluations initiales", "", "Une demande ne crée aucun compte. Examinez les besoins et l’adéquation (ce n’est pas un diagnostic), puis validez, demandez des précisions ou orientez la personne. Après validation et paiement, créez le compte.")}
    <div class="chips">${[["ouvertes", "À traiter"], ["infos_demandees", "Précisions demandées"], ["orientation", "Orientations"], ["refusee", "Non retenues"], ["compte_cree", "Comptes créés"], ["toutes", "Toutes"]]
      .map(([k, l]) => `<button class="chip" data-act="req-filter" data-v="${k}" aria-pressed="${f === k}">${l} <span class="chip-n">${k === "toutes" ? list.length : k === "ouvertes" ? list.filter(r => OPEN.includes(r.status)).length : list.filter(r => r.status === k).length}</span></button>`).join("")}</div>
-   <div class="stack">${A.requests ? rows.map(r => { const ev = Object.entries(r.evaluation || {}).filter(([, v]) => v);
+   <div class="stack">${A.requests ? [...rows].sort((a, b) => (+!!b.evaluation?.attention?.care) - (+!!a.evaluation?.attention?.care)).map(r => { const v2 = r.evaluation?._v === 2, ev = v2 ? [] : Object.entries(r.evaluation || {}).filter(([, v]) => v), ans = v2 ? r.evaluation.answers || {} : {};
      return `<article class="card stack req-card" style="gap:10px" id="req-${r.id}">
-     <div class="row" style="justify-content:space-between"><b>${esc(r.first_name)} ${esc(r.last_name)}</b><span class="badge ${["acceptee", "compte_cree"].includes(r.status) ? "ok" : ["refusee"].includes(r.status) ? "mute" : "warn"}">${REQ[r.status] || r.status}</span></div>
+     <div class="row" style="justify-content:space-between"><b>${esc(r.first_name)} ${esc(r.last_name)}</b><span class="row" style="gap:6px">${v2 && r.evaluation.attention?.care && OPEN.includes(r.status) ? `<span class="badge warn asm-prio">${icon("shield")}À examiner en priorité</span>` : ""}<span class="badge ${["acceptee", "compte_cree"].includes(r.status) ? "ok" : ["refusee"].includes(r.status) ? "mute" : "warn"}">${REQ[r.status] || r.status}</span></span></div>
      <p class="small">${esc(prog(r.programme_slug))} · ${PLAN[r.plan] || r.plan}</p>
      <p class="small muted">${esc(r.email)}${r.phone ? " · " + esc(r.phone) : ""} · reçue le ${fmtDate(r.created_at)}</p>
-     <details ${OPEN.includes(r.status) ? "open" : ""}><summary class="flabel">Mon évaluation initiale${ev.length ? "" : " (non remplie)"}</summary>
+     ${v2 ? `<p class="small muted">${[ageFrom(ans.date_naissance) != null ? ageFrom(ans.date_naissance) + " ans" : "", ans.ville, ans.commune, ans.contact_pref ? "préfère : " + ans.contact_pref : ""].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
+     <details ${OPEN.includes(r.status) ? "open" : ""}><summary class="flabel">${v2 ? "Pré-évaluation" : "Mon évaluation initiale" + (ev.length ? "" : " (non remplie)")}</summary>
+      ${v2 ? assessmentHTML(r.evaluation) : ""}
       ${ev.length ? `<dl class="facts facts-wide">${ev.map(([k, v]) => `<div><dt>${esc(EVAL_LABEL[k] || k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}
       ${r.message ? `<p class="small entry-body">« ${esc(r.message)} »</p>` : ""}</details>
      ${r.status === "compte_cree" ? `<p class="small">${icon("check")} Compte créé${r.enrolment_id ? ` · <button class="linkbtn" data-go="accompagnante-p-${r.enrolment_id}">Ouvrir le dossier</button>` : ""}</p>` : `
