@@ -212,7 +212,13 @@ export function createSupabaseBackend(url, key) {
     // Demande d'inscription : enregistrement vérifié côté serveur (fonction submit_enrolment_request),
     // qui renvoie l'identifiant et la référence ; puis e-mails de confirmation (fonction « inscriptions »).
     async submitRequest(r) {
-      const saved = ok(await sb.rpc('submit_enrolment_request', { p: r }));
+      const res = await sb.rpc('submit_enrolment_request', { p: r });
+      // Base pas encore mise à jour (fonction absente) : enregistrement direct, dont la réussite est vérifiée.
+      if (res.error && (res.error.code === 'PGRST202' || /submit_enrolment_request/.test(res.error.message || ''))) {
+        ok(await sb.from('enrolment_requests').insert(r));
+        return { id: null, reference: '(attribuée par l’équipe)', email: null };
+      }
+      const saved = ok(res);
       if (!saved?.id || !saved?.reference) throw new Error('Enregistrement non confirmé');
       let email = null;
       try { const { data } = await sb.functions.invoke('inscriptions', { body: { action: 'confirm', id: saved.id, reference: saved.reference } }); email = data?.email ?? null; }
