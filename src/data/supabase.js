@@ -174,6 +174,24 @@ export function createSupabaseBackend(url, key) {
     async team() { return ok(await sb.rpc('admin_team')); },
     async setRole(email, role) { ok(await sb.rpc('set_user_role', { target_email: email, new_role: role })); },
     async setFlag(k, v) { ok(await sb.rpc('admin_set_flag', { k, v })); },
+
+    // ---------- Questionnaire d'orientation ----------
+    // Si la migration n'est pas encore appliquée, on retombe sur la configuration par défaut (aucune erreur).
+    async orientationLoad() {
+      const r = await sb.from('orientation_versions').select('id, version, status, config, note, created_at, published_at').order('created_at', { ascending: false });
+      if (r.error) return { published: null, draft: null, history: [], missing: true };
+      const rows = r.data || [];
+      return { published: rows.find(x => x.status === 'published') || null, draft: rows.find(x => x.status === 'draft') || null,
+        history: rows.filter(x => x.status !== 'draft') };
+    },
+    async orientationSaveDraft(config) {
+      const cur = await sb.from('orientation_versions').select('id').eq('status', 'draft').maybeSingle();
+      if (cur.data) ok(await sb.from('orientation_versions').update({ config, created_at: new Date().toISOString() }).eq('id', cur.data.id));
+      else ok(await sb.from('orientation_versions').insert({ version: 0, status: 'draft', config }));
+    },
+    async orientationPublish(note) { return ok(await sb.rpc('orientation_publish', { p_note: note || '' })); },
+    async orientationTrack(slug, event) { try { await sb.rpc('orientation_track', { p_slug: slug, p_event: event }); } catch (e) {} },
+    async orientationStats() { const r = await sb.from('orientation_stats').select('*').order('day', { ascending: false }); return r.error ? [] : r.data; },
     async privacyList() { return ok(await sb.from('privacy_requests').select('*').order('created_at', { ascending: false })); },
     async resolvePrivacy(id) { ok(await sb.from('privacy_requests').update({ status: 'done', resolved_at: new Date().toISOString() }).eq('id', id)); },
     async contactList() { return ok(await sb.from('contact_messages').select('*').order('created_at', { ascending: false })); },

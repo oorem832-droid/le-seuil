@@ -7,6 +7,7 @@ import * as ST from "./ui/staff.js";
 import * as AD from "./ui/admin.js";
 import * as L from "./ui/library.js";
 import * as PG from "./ui/programmes.js";
+import * as OR from "./ui/orientation.js";
 import * as store from "./store.js";
 import { S, C } from "./store.js";
 import { stopBreath } from "./ui/exercises.js";
@@ -44,6 +45,8 @@ function page(r){
   if (r === "faq") return P.pFAQ();
   if (r === "contact") return P.pContact();
   if (r === "aide" || r === "urgence") return P.pHelp();
+  if (r === "besoin-aide") return OR.pHelpNow();
+  if (r === "trouver-mon-programme") return OR.pFind();
   if (P.isLegal(r)) return P.pLegal(r);
   if (r === "premier-acces" || r === "nouveau-mot-de-passe") return P.pFirstAccess();
   if (r === "connexion") return S.user ? redirect(P.homeRoute()) : P.pLogin();
@@ -97,7 +100,7 @@ function render(navigated = false){
   // Team area stays in French; content that only exists in French gets a short note in English mode.
   const teamArea = /^(accompagnante|admin|apercu|verification)/.test(ui.route);
   const note = /^article-/.test(ui.route) ? frOnly("article") : /^bibliotheque/.test(ui.route) ? frOnly("library")
-    : /^(semaine-|lecons|exercices|programme-)/.test(ui.route) ? frOnly("programme") : "";
+    : /^(semaine-|lecons|exercices|programme-|trouver-mon-programme)/.test(ui.route) ? frOnly("programme") : "";
   $("#app").innerHTML = P.header() + `<main id="main" tabindex="-1"${teamArea ? " data-noi18n" : ""}>${note ? `<div class="wrap lang-note-wrap">${note}</div>` : ""}${html}</main>` + P.footer();
   if (navigated) {
     window.scrollTo(0, 0);

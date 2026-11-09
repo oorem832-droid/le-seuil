@@ -46,7 +46,7 @@ function seed() {
     profiles: PERSONAS.map(p => ({ id: p.id, first_name: p.first_name, last_name: 'Démo', email: p.email, role: p.role, account_status: 'active', must_set_password: false, newsletter_opt_in: false, analytics_opt_in: false, reminders_opt_in: false, created_at: daysFrom(-30) })),
     coach_profiles: [{ user_id: COACH.id, display_name: COACH.name, public_title: COACH.title, bio: COACH.bio, verified: COACH.verified, hours: COACH.hours,
       response_delay: COACH.delay, limits: COACH.limits.join('\n'), active: true, availability: { days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' }, response_hours: 48 }],
-    feature_flags: { payments: false, written_support: true, support_calls: true, questionnaires: false, public_signup: false },
+    feature_flags: { payments: false, written_support: true, support_calls: true, questionnaires: false, public_signup: false, orientation: false },
     programmes: progs, programme_weeks: weeks, programme_steps: steps,
     articles: LIBRARY.map(a => ({ id: a.id, slug: a.slug, title: a.title, category: a.category, excerpt: a.chapeau, sections: a.sections, retenir: a.retenir,
       references_list: LIBRARY_REFERENCES, related: LIBRARY.filter(x => x.category === a.category && x.id !== a.id).slice(0, 3).map(x => x.slug),
@@ -449,6 +449,21 @@ export function createLocalBackend() {
     async team() { return T.profiles.filter(p => p.role !== 'member').map(p => ({ id: p.id, first_name: p.first_name, email: p.email, role: p.role, created_at: p.created_at })); },
     async setRole(email, role) { const p = T.profiles.find(x => x.email?.toLowerCase() === email.toLowerCase()); if (!p) deny('Aucun compte avec cet e-mail'); p.role = role; log('admin_set_role', null, { user: p.id, role }); persist(); },
     async setFlag(k, v) { T.feature_flags[k] = v; log('admin_set_flag', null, { flag: k, enabled: v }); persist(); },
+
+    // ---------- Questionnaire d'orientation (démo : tout reste dans ce navigateur) ----------
+    async orientationLoad() { T.orientation ||= { versions: [], stats: [] }; const v = T.orientation.versions;
+      return { published: v.find(x => x.status === 'published') || null, draft: v.find(x => x.status === 'draft') || null, history: v.filter(x => x.status !== 'draft').slice().reverse() }; },
+    async orientationSaveDraft(config) { T.orientation ||= { versions: [], stats: [] }; const d = T.orientation.versions.find(x => x.status === 'draft');
+      if (d) Object.assign(d, { config, created_at: now() }); else T.orientation.versions.push({ id: id(), version: 0, status: 'draft', config, note: '', created_at: now() }); persist(); },
+    async orientationPublish(note) { const v = T.orientation.versions; const d = v.find(x => x.status === 'draft'); if (!d) deny('Aucun brouillon');
+      v.filter(x => x.status === 'published').forEach(x => x.status = 'archived');
+      const n = Math.max(0, ...v.filter(x => x.status !== 'draft').map(x => x.version)) + 1;
+      v.push({ id: id(), version: n, status: 'published', config: JSON.parse(JSON.stringify(d.config)), note: note || '', created_at: now(), published_at: now() });
+      log('orientation_publish', null, { version: n }); persist(); return n; },
+    async orientationTrack(slug, event) { T.orientation ||= { versions: [], stats: [] }; const day = now().slice(0, 10);
+      const r = T.orientation.stats.find(x => x.day === day && x.programme_slug === slug && x.event === event);
+      if (r) r.count++; else T.orientation.stats.push({ day, programme_slug: slug, event, count: 1 }); persist(); },
+    async orientationStats() { return (T.orientation?.stats || []).slice().sort((a, b) => b.day.localeCompare(a.day)); },
     async privacyList() { return T.privacy_requests; },
     async resolvePrivacy(rid) { Object.assign(T.privacy_requests.find(r => r.id === rid), { status: 'done', resolved_at: now() }); persist(); },
     async contactList() { return T.contact_messages; },

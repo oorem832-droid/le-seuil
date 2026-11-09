@@ -7,9 +7,10 @@ import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
 import { aLibrary } from "./admin2.js";
 import { staffShell } from "./staff.js";
+import { aOrientation } from "./orientation.js";
 
 const A = ui.admin;
-const TABS = [["vue","Vue d’ensemble"],["bibliotheque","Bibliothèque"],["equipe","Équipe et accompagnantes"],["fonctionnalites","Fonctionnalités"],["contact","Messages de contact"],["confidentialite","Confidentialité et traçabilité"]];
+const TABS = [["vue","Vue d’ensemble"],["bibliotheque","Bibliothèque"],["equipe","Équipe et accompagnantes"],["fonctionnalites","Fonctionnalités"],["orientation","Questionnaire d’orientation"],["contact","Messages de contact"],["confidentialite","Confidentialité et traçabilité"]];
 const PLAN = { autonome: "Autonome", ecrit: "Accompagnement écrit", appels: "Accompagnement par appels" };
 const ROLE = { member: "Participant", editor: "Rédaction", coach: "Accompagnante", admin: "Administration" };
 const STATUS = { draft: "Brouillon", demo: "Maquette (visible)", published: "Publié", archived: "Archivé" };
@@ -35,7 +36,7 @@ actions["a-tab"] = async (b) => { ui.adminTab = b.dataset.v; ui.editing = null; 
 export function aMain(){
   const t = ui.adminTab;
   if (S.user.role === "editor" && !["programmes","bibliotheque"].includes(t)) ui.adminTab = "bibliotheque";
-  return ({ vue: aOverview, bibliotheque: () => aLibrary(shell), articles: () => aLibrary(shell), programmes: aProgrammes, equipe: aTeam, fonctionnalites: aFlags, contact: aContact, confidentialite: aPrivacy }[ui.adminTab] || aOverview)();
+  return ({ vue: aOverview, bibliotheque: () => aLibrary(shell), articles: () => aLibrary(shell), programmes: aProgrammes, equipe: aTeam, fonctionnalites: aFlags, orientation: () => aOrientation(shell, H), contact: aContact, confidentialite: aPrivacy }[ui.adminTab] || aOverview)();
 }
 
 /* ---------- Vue d'ensemble ---------- */
@@ -220,6 +221,7 @@ forms["a-roleform"] = async () => {
 const FL = [["payments","Paiement en ligne","Après validation juridique et choix du prestataire (mobile money, carte). Le paiement se fait côté serveur."],
   ["written_support","Accompagnement écrit (forfait 2)","Après validation du cadre, des limites, des délais et de la procédure d’orientation."],
   ["support_calls","Échanges par appels (forfait 3)","Après validation du cadre, des limites, des délais et de la procédure d’orientation."],
+  ["orientation","Questionnaire « Trouver mon programme » et parcours de sécurité","Après relecture clinique indépendante du questionnaire et des parcours de sécurité, vérification juridique, tests des scénarios, tests mobile et accessibilité, et vérification des ressources d’aide."],
   ["questionnaires","Questionnaires PHQ-9 / GAD-7 (forfaits 2 et 3)","Après validation de la supervision, des délais de revue, du consentement et de la réponse aux risques. Jamais pour le forfait Autonome."]];
 function aFlags(){
   return shell(`${H("Fonctionnalités", "", "Activez une fonctionnalité uniquement lorsque ses prérequis sont validés. Chaque changement est enregistré dans le journal de traçabilité.")}

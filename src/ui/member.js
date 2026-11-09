@@ -33,7 +33,7 @@ function resumeTarget(){
 
 /* ---------- Coquille ---------- */
 const NAV = () => [["espace","Tableau de bord","home"],["lecons","Mes leçons","book"],["exercices","Mes exercices","edit"],["journal","Mon journal","pen"],["objectifs","Mes objectifs","target"],
-  ["evolution","Mon évolution","chart"],["plan","Mon plan personnel","leaf"],["outils","Mes outils pour retrouver mon calme","sun"],
+  ["evolution","Mon évolution","chart"],["plan","Mon plan personnel","leaf"],["outils","Mes outils pour retrouver mon calme","sun"],["besoin-aide","Besoin d’aide maintenant ?","phone"],
   ...(store.plan() !== "autonome" ? [["coach","Mon coach","chat"]] : []),["compte","Mon compte","user"]];
 export function memberShell(inner, active = ui.route){
   return `<div class="wrap app"><nav class="side" aria-label="Mon espace"><div class="who"><span class="eyebrow">Mon espace</span><div class="who-name">${esc(S.user.name)}</div><span class="small muted">${esc(C.plans.find(p=>p.id===store.plan())?.short || "")}</span></div>

@@ -3,6 +3,7 @@
 import { esc, icon, cover, pageHead, fcfa, toast, $ } from "./util.js";
 import { ui, actions, forms, rerender, go } from "./state.js";
 import { C, DEMO, api } from "../store.js";
+import * as store from "../store.js";
 import { CATALOGUE_SIZE, EVALUATION_QUESTIONS, EVALUATION_NOTICE } from "../content.js";
 import { publishedArticles, articleCard, catSlug } from "./library.js";
 
@@ -21,6 +22,7 @@ export function pProgrammes(){
   const missing = CATALOGUE_SIZE - list.length;
   return pageHead("Nos programmes", "Des programmes de six semaines, à votre rythme", "Chaque programme propose des leçons interactives, de courtes vidéos, des exercices et des outils pratiques inspirés des thérapies cognitives et comportementales. Ils ne remplacent pas un suivi médical ou psychologique.") + `
   <section class="section" style="padding-top:36px"><div class="wrap stack-lg">
+   ${C.flags.orientation || store.isStaff() ? `<div class="card find-cta"><div class="stack" style="gap:4px"><b>Vous ne savez pas par où commencer ?</b><span class="muted small">Quelques questions, sans compte et sans enregistrement, pour vous suggérer un programme.</span></div><button class="btn btn-primary btn-sm" data-go="trouver-mon-programme">Trouver mon programme ${icon("arrow")}</button></div>` : ""}
    ${cats.length > 1 ? `<nav class="chips" aria-label="Catégories de programmes">${cats.map(c => `<a class="chip" href="#cat-${catSlug(c)}">${esc(c)}</a>`).join("")}</nav>` : ""}
    ${cats.map(c => `<section class="stack" id="cat-${catSlug(c)}" aria-labelledby="h-${catSlug(c)}"><h2 class="h-sub" id="h-${catSlug(c)}">${esc(c)}</h2>
      <div class="grid prog-grid">${list.filter(p => (p.category || "Programmes") === c).map(progCard).join("")}</div></section>`).join("")}

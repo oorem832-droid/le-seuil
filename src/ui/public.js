@@ -38,7 +38,7 @@ export function footer(){
      <p class="small" style="opacity:.85">Psychoéducation et programmes d’auto-assistance inspirés des TCC. Abidjan, Côte d’Ivoire.</p></div>
     <div><h4>Explorer</h4><div class="stack" style="gap:2px">${NAV.slice(1).map(([k,l])=>`<button class="f" data-go="${k}">${l}</button>`).join("")}</div></div>
     <div><h4>Informations</h4><div class="stack" style="gap:2px">
-     <button class="f" data-go="faq">Questions fréquentes</button><button class="f" data-go="limites">Ce que LE SEUIL propose et ne propose pas</button><button class="f" data-go="aide">Trouver une aide appropriée</button>
+     <button class="f" data-go="faq">Questions fréquentes</button><button class="f" data-go="limites">Ce que LE SEUIL propose et ne propose pas</button><button class="f" data-go="aide">Trouver une aide appropriée</button><button class="f" data-go="besoin-aide">Besoin d’aide maintenant ?</button>
      <button class="f" data-go="confidentialite">Confidentialité</button><button class="f" data-go="conditions">Conditions d’utilisation</button>
      <button class="f" data-go="accessibilite">Accessibilité</button><button class="f" data-go="protection">Protection et orientation</button></div></div>
     <div><h4>Contact</h4><div class="stack small" style="gap:6px;opacity:.9">
