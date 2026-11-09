@@ -4,6 +4,7 @@ import { esc, icon, cover, pageHead, fcfa, toast, $ } from "./util.js";
 import { ui, actions, forms, rerender, go } from "./state.js";
 import { C, DEMO, api } from "../store.js";
 import * as store from "../store.js";
+import { gateOn, screened } from "./orientation.js";
 import { CATALOGUE_SIZE, EVALUATION_QUESTIONS, EVALUATION_NOTICE } from "../content.js";
 import { publishedArticles, articleCard, catSlug } from "./library.js";
 
@@ -22,7 +23,7 @@ export function pProgrammes(){
   const missing = CATALOGUE_SIZE - list.length;
   return pageHead("Nos programmes", "Des programmes de six semaines, à votre rythme", "Chaque programme propose des leçons interactives, de courtes vidéos, des exercices et des outils pratiques inspirés des thérapies cognitives et comportementales. Ils ne remplacent pas un suivi médical ou psychologique.") + `
   <section class="section" style="padding-top:36px"><div class="wrap stack-lg">
-   ${C.flags.orientation || store.isStaff() ? `<div class="card find-cta"><div class="stack" style="gap:4px"><b>Vous ne savez pas par où commencer ?</b><span class="muted small">Quelques questions, sans compte et sans enregistrement, pour vous suggérer un programme.</span></div><button class="btn btn-primary btn-sm" data-go="trouver-mon-programme">Trouver mon programme ${icon("arrow")}</button></div>` : ""}
+   ${C.flags.orientation || store.isStaff() ? `<div class="card find-cta"><div class="stack" style="gap:4px"><b>${gateOn() ? "Pour rejoindre un programme, commencez ici" : "Vous ne savez pas par où commencer ?"}</b><span class="muted small">Quelques questions, sans compte et sans enregistrement, pour vous suggérer un ou deux programmes adaptés à votre situation.</span></div><button class="btn btn-primary btn-sm" data-go="trouver-mon-programme">Trouver mon programme ${icon("arrow")}</button></div>` : ""}
    ${cats.length > 1 ? `<nav class="chips" aria-label="Catégories de programmes">${cats.map(c => `<a class="chip" href="#cat-${catSlug(c)}">${esc(c)}</a>`).join("")}</nav>` : ""}
    ${cats.map(c => `<section class="stack" id="cat-${catSlug(c)}" aria-labelledby="h-${catSlug(c)}"><h2 class="h-sub" id="h-${catSlug(c)}">${esc(c)}</h2>
      <div class="grid prog-grid">${list.filter(p => (p.category || "Programmes") === c).map(progCard).join("")}</div></section>`).join("")}
@@ -37,11 +38,12 @@ const howToJoin = () => `<section class="card stack" aria-labelledby="join"><h2 
     <li><b>Vous recevez un e-mail</b> pour choisir votre mot de passe et accéder à votre espace.</li></ol></section>`;
 
 function plansHTML(p){
+  const canJoin = p.open && screened(p.slug);
   return `<div class="grid g3">${C.plans.map((pl, i) => `<article class="card plan-card ${pl.featured ? "featured" : ""}">
      <div class="stack" style="gap:4px"><span class="eyebrow">Formule ${i + 1}</span><h3 style="margin:0">${esc(pl.short)}</h3></div>
      <div class="price">${fcfa(pl.price).replace(" FCFA", "")} <small>FCFA · paiement unique</small></div>
      <ul class="ticks">${pl.lines.map(l => `<li>${esc(l)}</li>`).join("")}</ul>
-     ${p.open ? `<button class="btn ${pl.featured ? "btn-primary" : "btn-ghost"}" data-act="choose-plan" data-plan="${pl.id}">Choisir cette formule</button>` : ""}
+     ${canJoin ? `<button class="btn ${pl.featured ? "btn-primary" : "btn-ghost"}" data-act="choose-plan" data-plan="${pl.id}">Choisir cette formule</button>` : ""}
    </article>`).join("")}</div>
    <p class="small muted">Paiement unique pour le programme complet de six semaines, sans abonnement. * Selon les conditions du service. Les échanges ne sont ni des consultations psychologiques ni des séances de psychothérapie.</p>`;
 }
@@ -63,11 +65,13 @@ export function pProgramme(slug){
     </div>
    </div>
    <aside class="aside"><div class="card stack"><h3>Rejoindre ce programme</h3><p class="small muted">Trois formules, de ${fcfa(Math.min(...C.plans.map(x => x.price)))} à ${fcfa(Math.max(...C.plans.map(x => x.price)))}.</p>
-     ${p.open ? `<button class="btn btn-primary" data-act="choose-plan" data-plan="">Demander à rejoindre ce programme</button>` : `<p class="small muted">Les demandes pour ce programme ne sont pas encore ouvertes.</p>`}
+     ${!p.open ? `<p class="small muted">Les demandes pour ce programme ne sont pas encore ouvertes.</p>`
+       : !screened(p.slug) ? `<p class="small">Pour vérifier que ce programme vous convient, commencez par le questionnaire « Trouver mon programme ». Il vous suggérera un ou deux programmes adaptés.</p><button class="btn btn-primary" data-go="trouver-mon-programme">Trouver mon programme ${icon("arrow")}</button>`
+       : `${gateOn() ? `<p class="small find-ok">${icon("check")} Ce programme fait partie des suggestions de votre questionnaire.</p>` : ""}<button class="btn btn-primary" data-act="choose-plan" data-plan="">Demander à rejoindre ce programme</button>`}
      <p class="small muted">${icon("phone")} LE SEUIL n’est pas un service d’urgence. En cas de danger, appelez le SAMU au 185.</p></div></aside>
   </div></section>
   <section class="section band" id="formules"><div class="wrap stack-lg"><div class="stack" style="gap:6px"><span class="eyebrow">Les trois formules</span><h2>Choisir ma formule</h2></div>${plansHTML(p)}</div></section>
-  ${p.open ? `<section class="section" id="demande"><div class="wrap narrow" style="margin:0 auto">${requestForm(p, sel)}</div></section>` : ""}
+  ${p.open && screened(p.slug) ? `<section class="section" id="demande"><div class="wrap narrow" style="margin:0 auto">${requestForm(p, sel)}</div></section>` : ""}
   ${reads.length ? `<section class="section band lib-band"><div class="wrap stack-lg"><div class="stack" style="gap:6px"><span class="eyebrow">Lectures gratuites · La Bibliothèque</span><h2 class="h-sub">Pour aller plus loin, en accès libre</h2>
      <p class="small muted">Ces articles sont publics et indépendants du programme.</p></div><div class="grid g3">${reads.map(articleCard).join("")}</div>
      <a class="btn btn-ghost" href="#bibliotheque-${catSlug((p.library_categories || [])[0] || "")}" data-go="${(p.library_categories || []).length ? "bibliotheque-" + catSlug(p.library_categories[0]) : "bibliotheque"}" style="align-self:flex-start">Explorer la Bibliothèque</a></div></section>` : ""}`;
@@ -103,7 +107,7 @@ function requestForm(p, sel){
    <button class="btn btn-gold" type="submit" style="align-self:flex-start">Envoyer ma demande</button><p id="rq-out" class="small" role="status"></p>
   </form>`;
 }
-actions["choose-plan"] = (b) => { if (b.dataset.plan) ui.reqPlan = b.dataset.plan; rerender(); setTimeout(() => { document.getElementById("demande")?.scrollIntoView({ behavior: "smooth" }); document.getElementById("rq-first")?.focus({ preventScroll: true }); }, 50); };
+actions["choose-plan"] = (b) => { const slug = document.getElementById("rq-prog")?.value; if (slug && !screened(slug)) { go("trouver-mon-programme"); return; } if (b.dataset.plan) ui.reqPlan = b.dataset.plan; rerender(); setTimeout(() => { document.getElementById("demande")?.scrollIntoView({ behavior: "smooth" }); document.getElementById("rq-first")?.focus({ preventScroll: true }); }, 50); };
 actions["req-again"] = () => { ui.reqSent = null; rerender(); };
 forms["requestform"] = async (f) => {
   const out = (m) => { const el = $("#rq-out"); el.textContent = m; el.style.color = "var(--warn-fg)"; };

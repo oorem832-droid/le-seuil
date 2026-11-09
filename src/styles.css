@@ -548,3 +548,5 @@ table.parts th,table.parts td{padding-left:10px;padding-right:10px}
   nav.main button{min-height:44px}
   header.site .wrap{gap:10px}
 }
+
+.find-ok{display:flex;gap:6px;align-items:flex-start;color:var(--forest);font-weight:600}.find-ok svg{width:18px;height:18px;flex:none}

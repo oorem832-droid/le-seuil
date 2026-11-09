@@ -20,6 +20,14 @@ async function ensureLoaded(){
   O.loaded = true; O.loading = false; rerender();
 }
 const enabled = () => !!C.flags.orientation;
+/* Accès par le questionnaire : quand la fonctionnalité est activée, on ne peut demander à rejoindre
+   qu'un programme suggéré par le questionnaire. Seuls les identifiants des programmes suggérés sont gardés
+   pour la visite en cours (sessionStorage), jamais les réponses. */
+const SKEY = "leseuil-suggested";
+const readSugg = () => { try { return JSON.parse(sessionStorage.getItem(SKEY) || "[]"); } catch (e) { return []; } };
+const writeSugg = (l) => { try { sessionStorage.setItem(SKEY, JSON.stringify(l)); } catch (e) {} };
+export const gateOn = () => enabled();
+export const screened = (slug) => !gateOn() || readSugg().includes(slug);
 const staffPreview = () => store.isStaff() && !enabled();
 /** Configuration utilisée par le public : version publiée, sinon (aperçu équipe) le brouillon, sinon la configuration initiale. */
 function liveConfig(){
@@ -104,9 +112,10 @@ export function pFind(){
 function resultHTML(cfg){
   const r = result(cfg, O.answers, progs()), sf = cfg.safety;
   const list = r.suggestions.map(x => progs().find(p => p.slug === x.slug)).filter(Boolean);
+  writeSugg(list.map(p => p.slug));
   list.forEach(p => { const k = "s:" + p.slug; if (!O.tracked.has(k) && enabled()) { O.tracked.add(k); api.orientationTrack(p.slug, "suggested"); } });
   const cards = list.map(p => `<div class="find-prog-card"><span class="eyebrow">Programme ${esc(p.code || "")}</span><h3>${esc(p.title)}</h3><p class="muted">${esc(p.summary || "")}</p>
-     <button class="btn btn-primary btn-sm" data-act="or-choose" data-slug="${esc(p.slug)}">Découvrir ce programme ${icon("arrow")}</button></div>`).join("");
+     <button class="btn btn-primary btn-sm" data-act="or-choose" data-slug="${esc(p.slug)}">Voir ce programme et faire ma demande ${icon("arrow")}</button></div>`).join("");
   const msg = r.main === "B" ? `<div class="notice care-notice">${icon("info")}<div class="stack" style="gap:6px"><b>${esc(sf.B.title)}</b><span>${esc(sf.B.text)}</span></div></div>
        <div class="row"><button class="btn btn-primary" data-go="besoin-aide">Voir les ressources d’aide</button></div>${list.length ? `<p>${esc(sf.B.programmeText)}</p>` : ""}`
     : r.main === "C" ? `<div class="notice">${icon("info")}<div class="stack" style="gap:6px"><b>${esc(sf.C.title)}</b><span>${esc(sf.C.text)}</span></div></div>`
@@ -119,13 +128,13 @@ function resultHTML(cfg){
 }
 actions["or-next"] = () => { O.step++; rerender(); window.scrollTo?.(0, 0); };
 actions["or-back"] = () => { O.step = Math.max(0, O.step - 1); rerender(); };
-actions["or-restart"] = () => { O.answers = {}; O.step = 0; O.urgent = false; O.tracked = new Set(); rerender(); };
+actions["or-restart"] = () => { O.answers = {}; O.step = 0; O.urgent = false; O.tracked = new Set(); writeSugg([]); rerender(); };
 actions["or-answer"] = (b) => {
   const cfg = liveConfig(), q = b.dataset.q, o = b.dataset.o;
   O.answers[q] = o;
   // Les questions dépendantes déjà répondues mais devenues invisibles sont oubliées.
   for (const sq of cfg.safetyQuestions || []) if (!visible(sq, O.answers)) delete O.answers[sq.id];
-  if (immediate(cfg, q, o) === "A") { O.urgent = true; go("besoin-aide"); return; }   // Situation A : aide urgente immédiatement, rien d'autre.
+  if (immediate(cfg, q, o) === "A") { O.urgent = true; writeSugg([]); go("besoin-aide"); return; }   // Situation A : aide urgente immédiatement, rien d'autre.
   O.step++; rerender(); window.scrollTo?.(0, 0);
 };
 actions["or-choose"] = (b) => { if (enabled()) api.orientationTrack(b.dataset.slug, "chosen"); go("programme-" + b.dataset.slug); };
