@@ -5,12 +5,12 @@ import { esc, icon, fmtDate, toast, $, blocksToText, textToBlocks } from "./util
 import { ui, actions, forms, changes, rerender, go } from "./state.js";
 import * as store from "../store.js";
 import { C, S, DEMO, api } from "../store.js";
-import { aLibrary } from "./admin2.js";
+import { aLibrary, requestsPanel } from "./admin2.js";
 import { staffShell } from "./staff.js";
 import { aOrientation } from "./orientation.js";
 
 const A = ui.admin;
-const TABS = [["vue","Vue d’ensemble"],["bibliotheque","Bibliothèque"],["equipe","Équipe et accompagnantes"],["fonctionnalites","Fonctionnalités"],["orientation","Questionnaire d’orientation"],["contact","Messages de contact"],["confidentialite","Confidentialité et traçabilité"]];
+const TABS = [["vue","Vue d’ensemble"],["demandes","Demandes d’inscription"],["bibliotheque","Bibliothèque"],["equipe","Équipe et accompagnantes"],["fonctionnalites","Fonctionnalités"],["orientation","Questionnaire d’orientation"],["contact","Messages de contact"],["confidentialite","Confidentialité et traçabilité"]];
 const PLAN = { autonome: "Autonome", ecrit: "Accompagnement écrit", appels: "Accompagnement par appels" };
 const ROLE = { member: "Participant", editor: "Rédaction", coach: "Accompagnante", admin: "Administration" };
 const STATUS = { draft: "Brouillon", demo: "Maquette (visible)", published: "Publié", archived: "Archivé" };
@@ -28,15 +28,15 @@ function shell(inner, tab){
   // Toutes les pages d'administration s'affichent dans le menu privé de l'Espace accompagnante.
   if (tab === "programmes") return staffShell(inner, "accompagnante-programmes");
   const tabs = TABS.filter(([k]) => S.user.role === "admin" || k === "bibliotheque");
-  return staffShell(`<div class="tabs" role="tablist" aria-label="Administration">${tabs.map(([k,l]) => `<button role="tab" data-act="a-tab" data-v="${k}" aria-selected="${tab===k}">${l}</button>`).join("")}</div>${inner}`, "admin");
+  return staffShell(`<div class="tabs" role="tablist" aria-label="Administration">${tabs.map(([k,l]) => `<button role="tab" data-act="a-tab" data-v="${k}" aria-selected="${tab===k}">${l}${k==="demandes" && A.notifs?.length ? ` <span class="chip-n tab-badge">${A.notifs.length}</span>` : ""}</button>`).join("")}</div>${inner}`, "admin");
 }
 const H = (t, extra="", lede="") => `<div class="section-head" style="margin:0"><div class="stack" style="gap:6px"><span class="eyebrow">Administration</span><h1 class="h-page">${t}</h1>${lede?`<p class="muted">${lede}</p>`:""}</div>${extra}</div>`;
-actions["a-tab"] = async (b) => { ui.adminTab = b.dataset.v; ui.editing = null; ui.confirm = null; drop("overview","stats","enrolments","team","coaches","privacy","contact","log","referrals","programmes","articles","requests","participants","versions"); ui.newParticipant = null; ui.partSel = null; A.prog = null; A.progId = null; await store.loadContent(); go(ui.adminTab === "programmes" ? "accompagnante-programmes" : "admin"); };
+actions["a-tab"] = async (b) => { ui.adminTab = b.dataset.v; ui.editing = null; ui.confirm = null; drop("notifs","emailLog","emailStatus","overview","stats","enrolments","team","coaches","privacy","contact","log","referrals","programmes","articles","requests","participants","versions"); ui.newParticipant = null; ui.partSel = null; A.prog = null; A.progId = null; await store.loadContent(); go(ui.adminTab === "programmes" ? "accompagnante-programmes" : "admin"); };
 
 export function aMain(){
   const t = ui.adminTab;
   if (S.user.role === "editor" && !["programmes","bibliotheque"].includes(t)) ui.adminTab = "bibliotheque";
-  return ({ vue: aOverview, bibliotheque: () => aLibrary(shell), articles: () => aLibrary(shell), programmes: aProgrammes, equipe: aTeam, fonctionnalites: aFlags, orientation: () => aOrientation(shell, H), contact: aContact, confidentialite: aPrivacy }[ui.adminTab] || aOverview)();
+  return ({ demandes: () => requestsPanel(shell), vue: aOverview, bibliotheque: () => aLibrary(shell), articles: () => aLibrary(shell), programmes: aProgrammes, equipe: aTeam, fonctionnalites: aFlags, orientation: () => aOrientation(shell, H), contact: aContact, confidentialite: aPrivacy }[ui.adminTab] || aOverview)();
 }
 
 /* ---------- Vue d'ensemble ---------- */
@@ -44,7 +44,10 @@ function aOverview(){
   need("overview", () => api.overview()); need("stats", () => api.stats(store.PROGRAMME_SLUG));
   const o = A.overview || {}, st = A.stats || [];
   const suppressed = st.length && st[0].completed === null;
+  if (api.adminNotifications) need("notifs", () => api.adminNotifications());
+  const nn = (A.notifs || []).length;
   return shell(`${H("Vue d’ensemble")}
+   ${nn ? `<div class="notice" role="status">${icon("bell")}<span><b>${nn} nouvelle${nn>1?"s":""} notification${nn>1?"s":""}</b> : demande${nn>1?"s":""} d’inscription à consulter. <button class="linkbtn" data-act="a-tab" data-v="demandes">Ouvrir les demandes d’inscription</button></span></div>` : ""}
    ${DEMO?`<div class="notice">${icon("info")}<span>Maquette : chiffres issus des données fictives de ce navigateur.</span></div>`:""}
    <div class="kpis">${[["Participants",o.members],["Accompagnantes",o.coaches],["Inscriptions",o.enrolments],["Articles publiés",o.published_articles],["Orientations ouvertes",o.open_referrals],["Demandes de confidentialité",o.open_privacy_requests],["Messages non lus",o.unread_contact]].map(([l,v])=>`<div class="kpi"><span class="small muted">${l}</span><b>${A.overview?v??0:"…"}</b></div>`).join("")}</div>
    <div class="card stack"><h2 class="h-sub">Participants ayant terminé chaque semaine</h2><p class="small muted">Valeurs agrégées uniquement. Les réponses, journaux et messages des participants ne sont jamais accessibles à l’administration.</p>

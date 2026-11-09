@@ -600,3 +600,12 @@ input[type=tel],input[type=date]{font:inherit;color:var(--ink);background:var(--
   .asm-scores b{font-size:1.25rem}
 }
 .asm [hidden]{display:none!important}
+
+/* ---------- Demandes d'inscription / Finaliser mon inscription ---------- */
+.req-flag{border-color:var(--warn-fg)}
+.req-history{margin:8px 0 0;padding-left:18px;display:grid;gap:4px}
+.tab-badge{background:var(--forest);color:var(--on-forest);margin-left:4px}
+.req-card table th,.req-card table td,.fin-card table td{padding:6px 8px}
+.fin-test{border:1.5px dashed var(--warn-fg)}
+.fin-ok{background:color-mix(in srgb,var(--ok) 14%,var(--surface));color:var(--ink)}
+@media print{header.site,footer,.btn,.fin-test,nav{display:none!important}.fin-receipt{border:1px solid #999}}

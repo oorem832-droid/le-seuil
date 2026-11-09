@@ -47,6 +47,9 @@ function page(r){
   if (r === "aide" || r === "urgence") return P.pHelp();
   if (r === "besoin-aide") return OR.pHelpNow();
   if (r === "trouver-mon-programme") return OR.pFind();
+  // Lien de paiement : le jeton est mis de côté pour cette session puis retiré de l'adresse (pas d'historique, pas de mesure d'audience).
+  if ((m = r.match(/^finaliser-([A-Za-z0-9_-]{20,})$/))) { try { sessionStorage.setItem("leseuil-pay", m[1]); } catch(e) { ui.payToken = m[1]; } ui.payToken = m[1]; return redirect("finaliser"); }
+  if (r === "finaliser") return PG.pFinalise(ui.payToken || (() => { try { return sessionStorage.getItem("leseuil-pay"); } catch(e) { return null; } })());
   if (P.isLegal(r)) return P.pLegal(r);
   if (r === "premier-acces" || r === "nouveau-mot-de-passe") return P.pFirstAccess();
   if (r === "connexion") return S.user ? redirect(P.homeRoute()) : P.pLogin();
@@ -73,7 +76,8 @@ function page(r){
     if ((m = r.match(/^admin-programme-(.+)$/))) return AD.aProgramme(m[1]);
     if ((m = r.match(/^admin-semaine-(.+)-(\d+)$/))) { ui.params = [m[1], +m[2]]; return AD.aWeek(m[1], +m[2]); }
     if ((m = r.match(/^admin-etape-(.+)-(\d+)-(?:new-(\w+)|(\d+))$/))) { ui.params = [m[1], +m[2]]; return AD.aStep(m[1], +m[2], m[3] ? "new" : m[4], m[3]); }
-    if (["demandes", "participants", "programmes"].includes(ui.adminTab) && r === "admin") ui.adminTab = "vue";
+    if (r === "admin-demandes") ui.adminTab = "demandes";
+    else if (["participants", "programmes"].includes(ui.adminTab) && r === "admin") ui.adminTab = "vue";
     return AD.aMain();
   }
   // Espace participant
@@ -88,7 +92,7 @@ function page(r){
 }
 function redirect(r){ current = r; try { history.replaceState(null, "", "#" + r); } catch(e) {} ui.route = r; return page(r); }
 
-const PRIVATE = /^(programme|programmes|connexion|premier-acces|verification|espace|lecons|semaine|exercices|journal|objectifs|evolution|plan|outils|coach|compte|demarrer|admin|apercu|accompagnante)/;
+const PRIVATE = /^(finaliser|programme|programmes|connexion|premier-acces|verification|espace|lecons|semaine|exercices|journal|objectifs|evolution|plan|outils|coach|compte|demarrer|admin|apercu|accompagnante)/;
 function render(navigated = false){
   stopBreath();
   // Premier accès : le participant doit choisir son mot de passe avant toute autre page privée.

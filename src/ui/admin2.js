@@ -12,7 +12,10 @@ const A = ui.admin;
 const PLAN = { autonome: "Formule 1 · Autonome", ecrit: "Formule 2 · Écrit", appels: "Formule 3 · Appels" };
 const PAY = { non_paye: "Non payé", en_attente: "Paiement en attente", paye: "Payé", offert: "Offert" };
 const ADM = { en_attente: "Admission en attente", admis: "Admis", refuse: "Refusé" };
-const REQ = { nouvelle: "Nouvelle demande", en_cours: "En cours d’examen", infos_demandees: "Informations complémentaires demandées", acceptee: "Acceptée", orientation: "Orientation proposée", refusee: "Non retenue", compte_cree: "Compte créé" };
+export const REQ = { nouvelle: "En attente de validation", en_cours: "En cours d’examen", infos_demandees: "Informations complémentaires demandées", acceptee: "Approuvée · paiement en attente", orientation: "Orientation proposée", refusee: "Non retenue", annulee: "Annulée", compte_cree: "Compte créé", active: "Inscription active" };
+const RPAY = { non_requis: "Aucun paiement demandé", en_attente: "Paiement attendu", en_cours: "Paiement en cours", paye: "Payé", echoue: "Paiement échoué", annule: "Sans paiement" };
+const EVT = { creee: "Demande enregistrée", decision: "Décision", statut: "Statut modifié", paiement: "Paiement", paiement_initie: "Paiement lancé", paiement_reussi: "Paiement confirmé", paiement_echoue: "Paiement échoué", paiement_en_attente: "Paiement en attente", activation: "Accès activé", email_decision: "E-mail de décision", activation_erreur: "Erreur d’activation", activation_refusee: "Activation refusée", paiement_erreur_prestataire: "Erreur du prestataire", paiement_montant_incoherent: "Montant incohérent" };
+const fcfa = (n) => n ? new Intl.NumberFormat("fr-FR").format(n).replace(/\u202f|\u00a0/g, " ") + " FCFA" : "—";
 const ETAT = { brouillon: "Brouillon", a_relire: "À relire", publie: "Publié" };
 const loading = `<p class="muted">Chargement…</p>`;
 const H = (t, extra = "", lede = "") => `<div class="section-head" style="margin:0"><div class="stack" style="gap:6px"><span class="eyebrow">Administration</span><h1 class="h-page">${t}</h1>${lede ? `<p class="muted">${lede}</p>` : ""}</div>${extra}</div>`;
@@ -32,39 +35,109 @@ let afterChange = () => {};
 export const setAfterChange = (fn) => { afterChange = fn; };
 const REQ_ACTIONS = [["en_cours", "Passer en examen"], ["infos_demandees", "Demander des précisions"], ["acceptee", "Accepter"], ["orientation", "Proposer une orientation"], ["refusee", "Ne pas retenir"]];
 const EVAL_LABEL = Object.fromEntries(EVALUATION_QUESTIONS.map(q => [q.k, q.label]));
+const FILTERS = [
+  ["nouvelles", "Nouvelles", r => !r.seen_at && !["annulee"].includes(r.status)],
+  ["attente", "En attente de validation", r => ["nouvelle", "en_cours"].includes(r.status)],
+  ["infos_demandees", "Informations demandées", r => r.status === "infos_demandees"],
+  ["acceptee", "Approuvées", r => r.status === "acceptee"],
+  ["active", "Inscriptions actives", r => ["active", "compte_cree"].includes(r.status)],
+  ["refusee", "Non retenues", r => ["refusee", "orientation"].includes(r.status)],
+  ["annulee", "Annulées", r => r.status === "annulee"],
+  ["toutes", "Toutes", () => true]];
+const flagged = (r) => !!(r.priority_review || r.evaluation?.attention?.care);
 export function requestsPanel(shell) {
   need("requests", () => api.requests());
+  need("notifs", () => api.adminNotifications ? api.adminNotifications() : []);
   const list = A.requests || [];
-  const f = ui.reqFilter || "ouvertes";
-  const OPEN = ["nouvelle", "en_cours", "infos_demandees", "acceptee"];
-  const rows = list.filter(r => f === "toutes" || (f === "ouvertes" ? OPEN.includes(r.status) : r.status === f));
+  const f = ui.reqFilter || (list.some(r => !r.seen_at) ? "nouvelles" : "attente");
+  const FIL = FILTERS.find(x => x[0] === f) || FILTERS[1];
+  const rows = list.filter(r => FIL[2](r) || r.id === ui.reqOpen).sort((a, b) => (+flagged(b) - +flagged(a)) || (new Date(b.created_at) - new Date(a.created_at)));
   const prog = (slug) => C.programmes.find(p => p.slug === slug)?.title || slug;
-  return shell(`${H("Demandes et évaluations initiales", "", "Une demande ne crée aucun compte. Examinez les besoins et l’adéquation (ce n’est pas un diagnostic), puis validez, demandez des précisions ou orientez la personne. Après validation et paiement, créez le compte.")}
-   <div class="chips">${[["ouvertes", "À traiter"], ["infos_demandees", "Précisions demandées"], ["orientation", "Orientations"], ["refusee", "Non retenues"], ["compte_cree", "Comptes créés"], ["toutes", "Toutes"]]
-     .map(([k, l]) => `<button class="chip" data-act="req-filter" data-v="${k}" aria-pressed="${f === k}">${l} <span class="chip-n">${k === "toutes" ? list.length : k === "ouvertes" ? list.filter(r => OPEN.includes(r.status)).length : list.filter(r => r.status === k).length}</span></button>`).join("")}</div>
-   <div class="stack">${A.requests ? [...rows].sort((a, b) => (+!!b.evaluation?.attention?.care) - (+!!a.evaluation?.attention?.care)).map(r => { const v2 = r.evaluation?._v === 2, ev = v2 ? [] : Object.entries(r.evaluation || {}).filter(([, v]) => v), ans = v2 ? r.evaluation.answers || {} : {};
-     return `<article class="card stack req-card" style="gap:10px" id="req-${r.id}">
-     <div class="row" style="justify-content:space-between"><b>${esc(r.first_name)} ${esc(r.last_name)}</b><span class="row" style="gap:6px">${v2 && r.evaluation.attention?.care && OPEN.includes(r.status) ? `<span class="badge warn asm-prio">${icon("shield")}À examiner en priorité</span>` : ""}<span class="badge ${["acceptee", "compte_cree"].includes(r.status) ? "ok" : ["refusee"].includes(r.status) ? "mute" : "warn"}">${REQ[r.status] || r.status}</span></span></div>
-     <p class="small">${esc(prog(r.programme_slug))} · ${PLAN[r.plan] || r.plan}</p>
-     <p class="small muted">${esc(r.email)}${r.phone ? " · " + esc(r.phone) : ""} · reçue le ${fmtDate(r.created_at)}</p>
-     ${v2 ? `<p class="small muted">${[ageFrom(ans.date_naissance) != null ? ageFrom(ans.date_naissance) + " ans" : "", ans.ville, ans.commune, ans.contact_pref ? "préfère : " + ans.contact_pref : ""].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
-     <details ${OPEN.includes(r.status) ? "open" : ""}><summary class="flabel">${v2 ? "Pré-évaluation" : "Mon évaluation initiale" + (ev.length ? "" : " (non remplie)")}</summary>
-      ${v2 ? assessmentHTML(r.evaluation) : ""}
-      ${ev.length ? `<dl class="facts facts-wide">${ev.map(([k, v]) => `<div><dt>${esc(EVAL_LABEL[k] || k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}
-      ${r.message ? `<p class="small entry-body">« ${esc(r.message)} »</p>` : ""}</details>
-     ${r.status === "compte_cree" ? `<p class="small">${icon("check")} Compte créé${r.enrolment_id ? ` · <button class="linkbtn" data-go="accompagnante-p-${r.enrolment_id}">Ouvrir le dossier</button>` : ""}</p>` : `
-     <div class="grid g2" style="gap:10px">
-      <div class="field"><label class="flabel" for="rr-${r.id}">Résultat de l’examen administratif</label><textarea id="rr-${r.id}" rows="2" maxlength="5000">${esc(r.review_result || "")}</textarea></div>
-      <div class="field"><label class="flabel" for="rd-${r.id}">Décision d’admission ou d’orientation</label><textarea id="rd-${r.id}" rows="2" maxlength="5000" placeholder="Par exemple : programme adapté ; orientation vers une structure de santé…">${esc(r.decision_note || "")}</textarea></div></div>
-     <div class="field"><label class="flabel" for="rn-${r.id}">Note interne</label><input id="rn-${r.id}" type="text" value="${esc(r.admin_note || "")}" maxlength="500"></div>
-     <div class="row">${REQ_ACTIONS.filter(([k]) => k !== r.status).map(([k, l]) => `<button class="btn btn-soft btn-sm" data-act="req-status" data-id="${r.id}" data-s="${k}">${l}</button>`).join("")}
-      <button class="btn btn-soft btn-sm" data-act="req-note" data-id="${r.id}">Enregistrer</button>
-      ${["acceptee", "en_cours"].includes(r.status) ? `<button class="btn btn-primary btn-sm" data-act="req-create" data-id="${r.id}">${icon("user")}Créer le compte</button>` : ""}</div>`}</article>`; }).join("") || `<p class="muted">Aucune demande.</p>` : loading}</div>`, "demandes");
+  const notifs = (A.notifs || []);
+  return shell(`${H("Demandes d’inscription", "", "Chaque demande est examinée par vous : aucune n’est approuvée automatiquement. Le paiement n’est demandé qu’après votre approbation ; l’accès s’ouvre seulement après paiement confirmé par le prestataire.")}
+   ${notifs.length ? `<div class="notice req-notif" role="status">${icon("bell")}<div class="stack" style="gap:4px"><b>${notifs.length} notification${notifs.length > 1 ? "s" : ""} non lue${notifs.length > 1 ? "s" : ""}</b>${notifs.slice(0, 5).map(n => `<span class="small">${esc(n.title)} · ${fmtDate(n.created_at)}</span>`).join("")}</div></div>` : ""}
+   <div class="chips">${FILTERS.map(([k, l, fn]) => `<button class="chip" data-act="req-filter" data-v="${k}" aria-pressed="${f === k}">${l} <span class="chip-n">${list.filter(fn).length}</span></button>`).join("")}</div>
+   <div class="stack">${A.requests ? rows.map(r => requestCard(r, prog)).join("") || `<p class="muted">Aucune demande dans cette rubrique.</p>` : loading}</div>
+   ${emailPanel()}`, "demandes");
 }
-const reqPatch = (id) => ({ review_result: $("#rr-" + id)?.value.trim() || null, decision_note: $("#rd-" + id)?.value.trim() || null, admin_note: $("#rn-" + id)?.value.trim() || null });
+function requestCard(r, prog){
+  const v2 = r.evaluation?._v === 2, ev = v2 ? [] : Object.entries(r.evaluation || {}).filter(([, v]) => v && typeof v === "string"), ans = v2 ? r.evaluation.answers || {} : {};
+  const open = ui.reqOpen === r.id, fl = flagged(r), done = ["active", "compte_cree"].includes(r.status);
+  const badge = done ? "ok" : ["refusee", "annulee"].includes(r.status) ? "mute" : "warn";
+  return `<article class="card stack req-card${fl ? " req-flag" : ""}" style="gap:10px" id="req-${r.id}">
+   <div class="row" style="justify-content:space-between;align-items:flex-start"><div class="stack" style="gap:2px"><b>${esc(r.first_name)} ${esc(r.last_name)}</b><span class="small muted" data-noi18n>${esc(r.reference || "")}</span></div>
+    <span class="row" style="gap:6px">${!r.seen_at ? `<span class="badge">Nouvelle</span>` : ""}${fl && !done ? `<span class="badge warn">${icon("shield")}Réponses de sécurité à lire</span>` : ""}<span class="badge ${badge}">${REQ[r.status] || r.status}</span></span></div>
+   <p class="small">${esc(prog(r.programme_slug))} · ${PLAN[r.plan] || r.plan} · <b>${fcfa(r.price_fcfa || { autonome: 12000, ecrit: 30000, appels: 48000 }[r.plan])}</b> · ${RPAY[r.payment_status || "non_requis"] || ""}</p>
+   <p class="small muted">${esc(r.email)}${r.phone ? " · " + esc(r.phone) : ""} · reçue le ${fmtDate(r.created_at)}</p>
+   ${v2 ? `<p class="small muted">${[ageFrom(ans.date_naissance) != null ? ageFrom(ans.date_naissance) + " ans" : "", ans.ville, ans.commune].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
+   <button class="btn btn-soft btn-sm" data-act="req-open" data-id="${r.id}" aria-expanded="${open}" style="align-self:flex-start">${open ? "Fermer" : "Examiner la demande"}</button>
+   ${open ? `<div class="stack req-body">
+    <details open><summary class="flabel">${v2 ? "Pré-évaluation" : "Évaluation initiale"}</summary>
+     ${v2 ? assessmentHTML(r.evaluation) : ev.length ? `<dl class="facts facts-wide">${ev.map(([k, v]) => `<div><dt>${esc(EVAL_LABEL[k] || k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : `<p class="small muted">Aucune réponse détaillée.</p>`}
+     ${r.message ? `<p class="small entry-body">« ${esc(r.message)} »</p>` : ""}</details>
+    ${r.info_request ? `<p class="small"><b>Informations demandées :</b> ${esc(r.info_request)}</p>` : ""}
+    ${done ? `<p class="small">${icon("check")} Inscription active${r.activated_at ? " depuis le " + fmtDate(r.activated_at) : ""}${r.enrolment_id ? ` · <button class="linkbtn" data-go="accompagnante-p-${r.enrolment_id}">Ouvrir le dossier</button>` : ""}</p>${r.plan !== "autonome" ? `<p class="small muted">Formule avec accompagnement : attribuez une accompagnante depuis le dossier.</p>` : ""}` : decisionForm(r, fl)}
+    ${historyHTML(r)}
+   </div>` : ""}
+  </article>`;
+}
+function decisionForm(r, fl){
+  if (r.status === "acceptee") return `<div class="card-flat stack" style="gap:8px"><p class="small">${icon("check")} Approuvée le ${fmtDate(r.approved_at || r.reviewed_at)}. Le candidat a reçu un lien sécurisé (valable 14 jours) pour payer. L’accès s’ouvrira automatiquement après paiement confirmé.</p>
+     <div class="row"><button class="btn btn-soft btn-sm" data-act="req-relink" data-id="${r.id}">Renvoyer le lien de paiement</button><button class="btn btn-soft btn-sm" data-act="req-decide" data-id="${r.id}" data-d="annuler">Annuler la demande</button></div>
+     ${A["link_" + r.id] ? `<p class="small">Maquette — lien envoyé : <a href="${esc(A["link_" + r.id])}" data-noi18n>${esc(A["link_" + r.id])}</a></p>` : ""}</div>`;
+  if (["refusee", "annulee", "orientation"].includes(r.status)) return `<p class="small muted">Décision enregistrée le ${fmtDate(r.reviewed_at)}.${r.decision_note ? " Message : « " + esc(r.decision_note) + " »" : ""}</p>`;
+  return `<div class="card-flat stack" style="gap:10px">
+   <h3 class="h-card">Votre décision</h3>
+   <div class="field"><label class="flabel" for="rr-${r.id}">Résultat de votre examen (interne, jamais envoyé)${fl ? " *" : ""}</label><textarea id="rr-${r.id}" rows="2" maxlength="5000">${esc(r.review_result || "")}</textarea></div>
+   <div class="field"><label class="flabel" for="rm-${r.id}">Message au candidat (pour une demande d’informations ou une non-approbation)</label><textarea id="rm-${r.id}" rows="2" maxlength="2000" placeholder="Ex. : pourriez-vous nous préciser vos disponibilités pour les appels ?"></textarea><span class="hint">Ce texte est envoyé par e-mail : n’y mettez aucune information de santé.</span></div>
+   ${fl ? `<label class="check"><input id="rs-${r.id}" type="checkbox"><span>J’ai lu les réponses de sécurité de cette demande et je l’ai examinée selon la procédure interne.</span></label>` : ""}
+   <div class="row">
+    <button class="btn btn-primary btn-sm" data-act="req-decide" data-id="${r.id}" data-d="approuver">${icon("check")}Approuver la demande</button>
+    <button class="btn btn-soft btn-sm" data-act="req-decide" data-id="${r.id}" data-d="infos">Demander des informations complémentaires</button>
+    <button class="btn btn-soft btn-sm" data-act="req-decide" data-id="${r.id}" data-d="refuser">Ne pas approuver la demande</button>
+    ${r.status === "nouvelle" ? `<button class="btn btn-soft btn-sm" data-act="req-decide" data-id="${r.id}" data-d="examen">Passer en examen</button>` : ""}
+   </div>
+   <p class="small muted">Chaque décision est horodatée et enregistrée dans l’historique de la demande. Un e-mail adapté est envoyé au candidat.</p></div>`;
+}
+function historyHTML(r){
+  const evs = A["ev_" + r.id], pays = A["pay_" + r.id];
+  if (evs === undefined) { need("ev_" + r.id, () => api.requestEvents ? api.requestEvents(r.id) : []); need("pay_" + r.id, () => api.requestPayments ? api.requestPayments(r.id) : []); }
+  return `<details><summary class="flabel">Historique et paiements</summary>
+   ${pays?.length ? `<table class="small" style="width:100%"><thead><tr><th>Transaction</th><th>Montant</th><th>Statut</th><th>Reçu</th></tr></thead><tbody>${pays.map(x => `<tr><td data-noi18n>${esc(x.transaction_id)}</td><td>${fcfa(x.amount_fcfa)}</td><td>${esc({ initie: "Lancé", en_attente: "En attente", reussi: "Réussi", echoue: "Échoué", annule: "Annulé" }[x.status] || x.status)}</td><td data-noi18n>${esc(x.receipt_number || "")}</td></tr>`).join("")}</tbody></table>` : `<p class="small muted">Aucun paiement.</p>`}
+   ${evs ? `<ul class="small req-history">${evs.map(e => `<li><span class="muted">${fmtDate(e.created_at)} ${new Date(e.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span> · ${esc(EVT[e.event] || e.event)}${e.to_status ? " → " + esc(REQ[e.to_status] || RPAY[e.to_status] || e.to_status) : ""} <span class="muted">(${esc(e.actor || "")})</span></li>`).join("")}</ul>` : loading}</details>`;
+}
+function emailPanel(){
+  need("emailLog", () => api.emailLog ? api.emailLog() : []);
+  need("emailStatus", () => api.emailStatus ? api.emailStatus().catch(() => ({ error: true })) : null);
+  const st = A.emailStatus || {}, log = A.emailLog || [];
+  const KIND = { confirmation: "Confirmation au candidat", admin_nouvelle: "Notification à l’administratrice", approuvee: "Approbation + lien de paiement", infos: "Demande d’informations", refusee: "Non-approbation", annulee: "Annulation", bienvenue: "Bienvenue + reçu" };
+  const STAT = { envoye: "Envoyé", echec: "Échec", non_configure: "Service non configuré", maquette: "Maquette (non envoyé)" };
+  return `<details class="card stack" style="gap:10px"><summary class="flabel">Vérification des e-mails et du paiement</summary>
+   <dl class="facts">
+    <div><dt>Service d’envoi</dt><dd>${st.error ? "Fonction « inscriptions » non déployée" : st.demo ? "Maquette (aucun envoi réel)" : st.resend ? "Resend configuré" : "Non configuré : aucun e-mail ne peut partir"}</dd></div>
+    <div><dt>Expéditeur</dt><dd data-noi18n>${esc(st.from || "LE SEUIL <leseuil@orejeen.com>")}</dd></div>
+    <div><dt>Notifications à</dt><dd data-noi18n>${esc(st.admin || "leseuil@orejeen.com")}</dd></div>
+    <div><dt>Paiement</dt><dd>${st.payment_mode === "cinetpay" ? (st.cinetpay ? "CinetPay (réel)" : "CinetPay : clés manquantes") : st.payment_mode === "test" ? "Mode test (aucun argent réel)" : "Désactivé"}</dd></div></dl>
+   ${log.length ? `<table class="small" style="width:100%"><thead><tr><th>Date</th><th>E-mail</th><th>Destinataire</th><th>Statut</th></tr></thead><tbody>${log.map(m => `<tr><td>${fmtDate(m.created_at)}</td><td>${esc(KIND[m.kind] || m.kind)}</td><td data-noi18n>@${esc(m.recipient_domain || "")}</td><td>${esc(STAT[m.status] || m.status)}${m.error ? ` <span class="muted">(${esc(m.error)})</span>` : ""}</td></tr>`).join("")}</tbody></table>` : `<p class="small muted">Aucun e-mail enregistré.</p>`}
+  </details>`;
+}
 actions["req-filter"] = (b) => { ui.reqFilter = b.dataset.v; rerender(); };
-actions["req-status"] = async (b) => { try { await api.updateRequest(b.dataset.id, { ...reqPatch(b.dataset.id), status: b.dataset.s, reviewed_at: new Date().toISOString() }); drop("requests"); afterChange(); toast("Demande : " + (REQ[b.dataset.s] || b.dataset.s)); rerender(); } catch (e) { err(e); } };
-actions["req-note"] = async (b) => { try { await api.updateRequest(b.dataset.id, reqPatch(b.dataset.id)); drop("requests"); toast("Enregistré"); rerender(); } catch (e) { err(e); } };
+actions["req-open"] = async (b) => { const id = b.dataset.id; ui.reqOpen = ui.reqOpen === id ? null : id; drop("ev_" + id, "pay_" + id); rerender();
+  const r = (A.requests || []).find(x => x.id === id); if (r && !r.seen_at && api.markRequestSeen) { try { await api.markRequestSeen(id); r.seen_at = new Date().toISOString(); drop("notifs"); rerender(); } catch (e) { console.error(e); } } };
+actions["req-decide"] = async (b) => {
+  const id = b.dataset.id, d = b.dataset.d;
+  const msg = $("#rm-" + id)?.value.trim() || "", review = $("#rr-" + id)?.value.trim() || "", safety = !!$("#rs-" + id)?.checked;
+  if (d === "infos" && !msg) return toast("Écrivez les informations demandées dans « Message au candidat ».");
+  if (d === "annuler" && !confirm("Annuler cette demande ? Le candidat en sera informé par e-mail.")) return;
+  b.disabled = true;
+  try {
+    const res = await api.decideRequest(id, d, msg, review, safety);
+    if (res?.demo_link) A["link_" + id] = res.demo_link;
+    drop("requests", "ev_" + id, "pay_" + id, "emailLog", "notifs"); afterChange();
+    toast(`Décision enregistrée : ${REQ[res.status] || res.status}${d === "examen" ? "" : res.email ? " · e-mail envoyé" : " · e-mail NON envoyé (voir Vérification des e-mails)"}`); rerender();
+  } catch (e) { err(e); b.disabled = false; }
+};
+actions["req-relink"] = async (b) => { b.disabled = true; try { const r = await api.resendPaymentLink(b.dataset.id); if (r?.demo_link) A["link_" + b.dataset.id] = r.demo_link; drop("emailLog", "ev_" + b.dataset.id); toast(r?.email ? "Nouveau lien envoyé (l’ancien ne fonctionne plus)" : "Lien créé, mais l’e-mail n’a pas pu partir"); rerender(); } catch (e) { err(e); b.disabled = false; } };
 actions["req-create"] = (b) => { const r = (A.requests || []).find(x => x.id === b.dataset.id); ui.newParticipant = { ...r, fromRequest: r.id }; afterChange({ open: ui.newParticipant }); };
 export function aRequests(shell) { return requestsPanel(shell); }
 

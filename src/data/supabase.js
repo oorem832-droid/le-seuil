@@ -209,16 +209,36 @@ export function createSupabaseBackend(url, key) {
     },
     async articleVersions(uuid) { return ok(await sb.from('article_versions').select('id, created_at, snapshot').eq('article_id', uuid).order('created_at', { ascending: false }).limit(20)); },
     // Demandes d'inscription
+    // Demande d'inscription : enregistrement vérifié côté serveur (fonction submit_enrolment_request),
+    // qui renvoie l'identifiant et la référence ; puis e-mails de confirmation (fonction « inscriptions »).
     async submitRequest(r) {
-      const res = await sb.from('enrolment_requests').insert(r);
-      // Colonne « evaluation » absente (migration 20261110 non appliquée) : on garde la demande et on le signale.
-      if (res.error && r.evaluation && /evaluation/.test(res.error.message || '')) {
-        console.error('Pré-évaluation non enregistrée : appliquez la migration 20261110000000_pre_evaluation.sql', res.error);
-        const { evaluation, ...rest } = r;
-        rest.message = ('[Pré-évaluation non enregistrée — à refaire par téléphone] ' + (rest.message || '')).slice(0, 2000);
-        return ok(await sb.from('enrolment_requests').insert(rest));
+      const saved = ok(await sb.rpc('submit_enrolment_request', { p: r }));
+      if (!saved?.id || !saved?.reference) throw new Error('Enregistrement non confirmé');
+      let email = null;
+      try { const { data } = await sb.functions.invoke('inscriptions', { body: { action: 'confirm', id: saved.id, reference: saved.reference } }); email = data?.email ?? null; }
+      catch (e) { console.warn('E-mail de confirmation non envoyé', e); }
+      return { ...saved, email };
+    },
+    async decideRequest(id, decision, message, review, safety) {
+      const res = ok(await sb.rpc('decide_enrolment_request', { p_id: id, p_decision: decision, p_message: message || null, p_review_result: review || null, p_safety_reviewed: !!safety }));
+      let email = null;
+      if (decision !== 'examen') {
+        const { data, error } = await sb.functions.invoke('inscriptions', { body: { action: 'decision_email', id } });
+        email = error ? false : data?.email;
       }
-      ok(res);
+      return { ...res, email };
+    },
+    async resendPaymentLink(id) { const { data, error } = await sb.functions.invoke('inscriptions', { body: { action: 'resend_payment_link', id } }); if (error) throw error; return data; },
+    async requestEvents(id) { return ok(await sb.from('request_events').select('*').eq('request_id', id).order('created_at')); },
+    async requestPayments(id) { return ok(await sb.from('request_payments').select('transaction_id, provider, amount_fcfa, status, payment_method, paid_at, receipt_number, created_at').eq('request_id', id).order('created_at', { ascending: false })); },
+    async markRequestSeen(id) { ok(await sb.rpc('mark_request_seen', { p_id: id })); },
+    async adminNotifications() { return ok(await sb.from('admin_notifications').select('*').is('read_at', null).order('created_at', { ascending: false }).limit(50)); },
+    async emailLog() { return ok(await sb.from('email_log').select('*').order('created_at', { ascending: false }).limit(30)); },
+    async emailStatus() { const { data, error } = await sb.functions.invoke('inscriptions', { body: { action: 'email_status' } }); if (error) throw error; return data; },
+    async checkout(action, token, extra = {}) {
+      const { data, error } = await sb.functions.invoke('inscriptions', { body: { action, token, ...extra } });
+      if (error) { let msg = 'Service indisponible.'; try { msg = (await error.context.json()).error || msg; } catch (e) {} throw new Error(msg); }
+      return data;
     },
     async requests() { return ok(await sb.from('enrolment_requests').select('*').order('created_at', { ascending: false })); },
     async updateRequest(id, patch) { ok(await sb.from('enrolment_requests').update({ ...patch, handled_by: uid }).eq('id', id)); },

@@ -46,7 +46,7 @@ function seed() {
     profiles: PERSONAS.map(p => ({ id: p.id, first_name: p.first_name, last_name: 'Démo', email: p.email, role: p.role, account_status: 'active', must_set_password: false, newsletter_opt_in: false, analytics_opt_in: false, reminders_opt_in: false, created_at: daysFrom(-30) })),
     coach_profiles: [{ user_id: COACH.id, display_name: COACH.name, public_title: COACH.title, bio: COACH.bio, verified: COACH.verified, hours: COACH.hours,
       response_delay: COACH.delay, limits: COACH.limits.join('\n'), active: true, availability: { days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' }, response_hours: 48 }],
-    feature_flags: { payments: false, written_support: true, support_calls: true, questionnaires: false, public_signup: false, orientation: false, pre_evaluation: false, pre_evaluation_scores: false },
+    feature_flags: { payments: false, written_support: true, support_calls: true, questionnaires: false, public_signup: false, orientation: false, pre_evaluation: false, pre_evaluation_scores: false, admin_email_notifications: true },
     programmes: progs, programme_weeks: weeks, programme_steps: steps,
     articles: LIBRARY.map(a => ({ id: a.id, slug: a.slug, title: a.title, category: a.category, excerpt: a.chapeau, sections: a.sections, retenir: a.retenir,
       references_list: LIBRARY_REFERENCES, related: LIBRARY.filter(x => x.category === a.category && x.id !== a.id).slice(0, 3).map(x => x.slug),
@@ -106,6 +106,24 @@ export function createLocalBackend() {
   const eid = () => myEnrolment()?.id;
   const log = (action, enrolment_id, details = {}) => T.access_log.unshift({ id: T.access_log.length + 1, actor_id: uid, actor_role: me()?.role, action, enrolment_id, details, created_at: now() });
   const name = (u) => T.profiles.find(p => p.id === u)?.first_name || '';
+  const PRICE = { autonome: 12000, ecrit: 30000, appels: 48000 };
+  const PLAN_LABEL = { autonome: 'Formule 1 — Autonome', ecrit: 'Formule 2 — Accompagnement écrit', appels: 'Formule 3 — Accompagnement par appels' };
+  const ensureFlow = () => { for (const k of ['request_events', 'admin_notifications', 'email_log', 'request_payments', 'payment_links']) T[k] = T[k] || []; };
+  const ev = (rid, event, actor, from_status, to_status, details = {}) => T.request_events.push({ id: T.request_events.length + 1, request_id: rid, actor, actor_id: uid, event, from_status, to_status, details, created_at: now() });
+  const mail = (rid, kind, to, subject, link) => T.email_log.unshift({ id: id(), request_id: rid, kind, recipient_domain: to.split('@')[1], status: 'maquette', subject, link: link || null, created_at: now() });
+  const newLink = (rid) => { T.payment_links = T.payment_links.filter(x => x.request_id !== rid); const token = (id() + id()).replace(/-/g, ''); T.payment_links.push({ token, request_id: rid, expires_at: new Date(Date.now() + 14 * 864e5).toISOString() }); return '#finaliser-' + token; };
+  const activateDemo = (r, prog, pay) => {
+    if (r.status === 'active' || r.status !== 'acceptee' || !prog) return;
+    let u = T.profiles.find(p => (p.email || '').toLowerCase() === r.email.toLowerCase());
+    if (!u) { u = { id: id(), first_name: r.first_name, last_name: r.last_name, email: r.email, role: 'member', account_status: 'active', must_set_password: true, created_at: now() }; T.profiles.push(u); }
+    let e = T.enrolments.find(x => x.user_id === u.id && x.programme_id === prog.id);
+    if (!e) { e = { id: id(), user_id: u.id, programme_id: prog.id, created_at: now(), suspended: false, coach_id: null, share_summaries: false, share_goals: false, questionnaires_enabled: false, last_step_id: null, unlock_all: false }; T.enrolments.push(e); }
+    Object.assign(e, { plan: r.plan, status: 'active', payment_status: 'paye', admission_status: 'admis' });
+    Object.assign(r, { status: 'active', activated_at: now(), enrolment_id: e.id, user_id: u.id });
+    ev(r.id, 'activation', 'systeme', 'acceptee', 'active', { enrolment_id: e.id, plan: r.plan });
+    T.admin_notifications.unshift({ id: id(), kind: 'inscription_active', request_id: r.id, title: `Paiement confirmé — inscription active ${r.reference}${r.plan !== 'autonome' ? ' (attribuer une accompagnante)' : ''}`, read_at: null, created_at: now() });
+    mail(r.id, 'bienvenue', r.email, 'LE SEUIL — Paiement confirmé, bienvenue ! (reçu ' + pay.receipt_number + ')');
+  };
   const supportOpen = (e) => (e.plan === 'ecrit' && T.feature_flags.written_support) || (e.plan === 'appels' && T.feature_flags.support_calls);
   const kindAllowed = (e, k) => k === 'pratique' || e.plan === 'ecrit';
   const canQ = (e) => T.feature_flags.questionnaires && e.plan !== 'autonome' && e.questionnaires_enabled && T.programmes.find(p => p.id === e.programme_id)?.questionnaires_enabled;
@@ -480,7 +498,86 @@ export function createLocalBackend() {
       persist();
     },
     async articleVersions(uuid) { return T.article_versions.filter(v => v.article_id === uuid).slice(0, 20); },
-    async submitRequest(r) { T.enrolment_requests.unshift({ id: id(), ...r, status: 'nouvelle', created_at: now() }); persist(); },
+    // ---------- Parcours d'inscription (maquette : aucun e-mail réel, aucun argent réel) ----------
+    async submitRequest(r) {
+      ensureFlow();
+      if (!['autonome', 'ecrit', 'appels'].includes(r.plan) || !r.is_adult || !r.consent) throw new Error('Demande incomplète');
+      const n = (T.req_seq = (T.req_seq || 0) + 1), d = new Date();
+      const row = { id: id(), ...r, reference: `LS-${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}-${String(n).padStart(4, '0')}`,
+        status: 'nouvelle', payment_status: 'non_requis', price_fcfa: PRICE[r.plan], priority_review: !!r.evaluation?.attention?.care, created_at: now() };
+      T.enrolment_requests.unshift(row);
+      ev(row.id, 'creee', 'candidat', null, 'nouvelle');
+      T.admin_notifications.unshift({ id: id(), kind: 'nouvelle_demande', request_id: row.id, title: 'Nouvelle demande d’inscription ' + row.reference, read_at: null, created_at: now() });
+      mail(row.id, 'confirmation', row.email, 'LE SEUIL — Nous avons bien reçu votre demande');
+      if (T.feature_flags.admin_email_notifications !== false) mail(row.id, 'admin_nouvelle', 'leseuil@orejeen.com', 'LE SEUIL — Nouvelle demande d’inscription');
+      persist();
+      return { id: row.id, reference: row.reference, status: row.status, email: true };
+    },
+    async decideRequest(rid, decision, message, review, safety) {
+      ensureFlow();
+      const r = T.enrolment_requests.find(x => x.id === rid); if (!r) throw new Error('Demande introuvable');
+      if (['active', 'compte_cree'].includes(r.status)) throw new Error('Cette inscription est déjà active');
+      const st = { approuver: 'acceptee', infos: 'infos_demandees', refuser: 'refusee', annuler: 'annulee', examen: 'en_cours' }[decision];
+      if (!st) throw new Error('Décision invalide');
+      if (st === 'acceptee' && r.priority_review && (!safety || !(review || '').trim())) throw new Error('Demande signalée : confirmez la lecture des réponses de sécurité et renseignez le résultat de l’examen avant d’approuver.');
+      if (st === 'infos_demandees' && !(message || '').trim()) throw new Error('Précisez les informations demandées');
+      const from = r.status;
+      Object.assign(r, { status: st, reviewed_at: now(), handled_by: uid, review_result: (review || '').trim() || r.review_result || null,
+        info_request: st === 'infos_demandees' ? message.trim() : r.info_request, decision_note: ['refusee', 'annulee'].includes(st) ? (message || '').trim() || null : r.decision_note,
+        approved_at: st === 'acceptee' ? now() : r.approved_at, price_fcfa: r.price_fcfa || PRICE[r.plan],
+        payment_status: st === 'acceptee' ? 'en_attente' : ['refusee', 'annulee'].includes(st) ? 'annule' : r.payment_status });
+      ev(rid, 'decision', 'admin', from, st, { decision, safety_reviewed: !!safety });
+      let link = null;
+      if (st === 'acceptee') { link = newLink(rid); mail(rid, 'approuvee', r.email, 'LE SEUIL — Votre demande a été approuvée', link); }
+      else if (st === 'infos_demandees') mail(rid, 'infos', r.email, 'LE SEUIL — Informations complémentaires sur votre demande');
+      else if (st === 'refusee') mail(rid, 'refusee', r.email, 'LE SEUIL — Votre demande d’inscription');
+      else if (st === 'annulee') mail(rid, 'annulee', r.email, 'LE SEUIL — Annulation de votre demande');
+      persist();
+      return { id: rid, status: st, reference: r.reference, email: decision !== 'examen', demo_link: link };
+    },
+    async resendPaymentLink(rid) { ensureFlow(); const r = T.enrolment_requests.find(x => x.id === rid); if (r?.status !== 'acceptee') throw new Error('La demande n’est pas approuvée'); const link = newLink(rid); mail(rid, 'approuvee', r.email, 'LE SEUIL — Votre demande a été approuvée', link); persist(); return { ok: true, email: true, demo_link: link }; },
+    async requestEvents(rid) { ensureFlow(); return T.request_events.filter(e => e.request_id === rid); },
+    async requestPayments(rid) { ensureFlow(); return T.request_payments.filter(x => x.request_id === rid).slice().reverse(); },
+    async markRequestSeen(rid) { ensureFlow(); const r = T.enrolment_requests.find(x => x.id === rid); if (r && !r.seen_at) r.seen_at = now(); T.admin_notifications.forEach(n => { if (n.request_id === rid && !n.read_at) n.read_at = now(); }); persist(); },
+    async adminNotifications() { ensureFlow(); return T.admin_notifications.filter(n => !n.read_at); },
+    async emailLog() { ensureFlow(); return T.email_log.slice(0, 30); },
+    async emailStatus() { return { ok: true, resend: false, demo: true, from: 'LE SEUIL <leseuil@orejeen.com>', admin: 'leseuil@orejeen.com', payment_mode: 'test', cinetpay: false }; },
+    async checkout(action, token, extra = {}) {
+      ensureFlow();
+      const l = T.payment_links.find(x => x.token === token); if (!l) throw new Error('Lien invalide.');
+      const r = T.enrolment_requests.find(x => x.id === l.request_id), prog = T.programmes.find(x => x.slug === r.programme_slug);
+      const expired = new Date(l.expires_at) < new Date();
+      const pays = T.request_payments.filter(x => x.request_id === r.id), paid = pays.find(x => x.status === 'reussi'), last = pays[pays.length - 1];
+      const view = () => { const ps = T.request_payments.filter(x => x.request_id === r.id), pd = ps.find(x => x.status === 'reussi'), ls = ps[ps.length - 1], u = pd || ls;
+        return { ok: true, first_name: r.first_name, reference: r.reference, programme: prog?.title || r.programme_slug, plan: r.plan, plan_label: PLAN_LABEL[r.plan], price_fcfa: r.price_fcfa,
+          status: r.status, payment_status: r.payment_status, expires_at: l.expires_at, expired, mode: 'test',
+          payment: u ? { transaction_id: u.transaction_id, status: u.status, paid_at: pd?.paid_at || null, receipt_number: pd?.receipt_number || null, amount_fcfa: u.amount_fcfa } : null }; };
+      if (action === 'checkout_info' || action === 'checkout_refresh') return view();
+      if (action === 'checkout_start') {
+        if (expired) throw new Error('Ce lien a expiré.');
+        if (r.status === 'active') throw new Error('Votre inscription est déjà active.');
+        if (r.status !== 'acceptee') throw new Error('Le paiement n’est possible qu’après l’approbation de votre demande.');
+        const tx = 'LS' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+        T.request_payments.push({ id: id(), request_id: r.id, transaction_id: tx, provider: 'test', amount_fcfa: r.price_fcfa, status: 'initie', created_at: now() });
+        r.payment_status = 'en_cours'; ev(r.id, 'paiement_initie', 'candidat', null, null, { transaction_id: tx }); persist();
+        return { ok: true, mode: 'test', transaction_id: tx };
+      }
+      if (action === 'test_complete') {
+        if (me()?.role !== 'admin') throw new Error('Simulation réservée à l’administration.');
+        const pay = T.request_payments.find(x => x.transaction_id === extra.transaction_id && x.request_id === r.id); if (!pay) throw new Error('Transaction inconnue.');
+        if (pay.status === 'reussi') { persist(); return { ok: true, already: true }; }
+        if (extra.outcome === 'reussi') {
+          Object.assign(pay, { status: 'reussi', paid_at: now(), receipt_number: 'R-' + pay.transaction_id.slice(-10), payment_method: 'TEST' });
+          r.payment_status = 'paye'; ev(r.id, 'paiement_reussi', 'prestataire', null, null, { transaction_id: pay.transaction_id });
+          activateDemo(r, prog, pay);
+        } else {
+          pay.status = extra.outcome === 'echoue' ? 'echoue' : 'en_attente'; r.payment_status = extra.outcome === 'echoue' ? 'echoue' : 'en_cours';
+          ev(r.id, extra.outcome === 'echoue' ? 'paiement_echoue' : 'paiement_en_attente', 'prestataire', null, null, { transaction_id: pay.transaction_id });
+        }
+        persist(); return { ok: true };
+      }
+      throw new Error('Action inconnue');
+    },
     async requests() { return T.enrolment_requests; },
     async updateRequest(rid, patch) { Object.assign(T.enrolment_requests.find(r => r.id === rid), patch, { updated_at: now() }); persist(); },
     async participants() {

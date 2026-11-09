@@ -43,7 +43,7 @@ const pname = (p) => `${esc(p.first_name || "")} ${esc(p.last_name || "")}`.trim
 /* ---------- Menu privé ---------- */
 const MENU = [
   ["accompagnante", "Tableau de bord", "home", () => isTeam()],
-  ["accompagnante-demandes", "Demandes et évaluations initiales", "bell", () => isAdmin()],
+  ["accompagnante-demandes", "Demandes d’inscription", "bell", () => isAdmin()],
   ["accompagnante-participants", "Mes participants", "users", () => isTeam()],
   ["accompagnante-messages", "Messages et échanges", "chat", () => isTeam()],
   ["accompagnante-agenda", "Agenda et rendez-vous", "cal", () => isTeam()],

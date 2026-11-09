@@ -83,14 +83,18 @@ export function pProgramme(slug){
 const asmOn = () => !!C.flags?.pre_evaluation;
 const secs = () => SECTIONS.filter(s => !s.flag || C.flags?.[s.flag]);
 const activeFields = () => secs().flatMap(s => s.fields);
-function requestForm(p, sel){
-  if (!asmOn() && ui.reqSent !== p.slug) return requestFormSimple(p, sel);
-  if (ui.reqSent === p.slug) return `<div class="card stack" role="status"><h2 class="h-sub">${icon("check")} Votre demande a bien été transmise</h2>
-    <p>Merci d’avoir pris le temps de répondre. L’équipe LE SEUIL va examiner votre pré-évaluation et l’adéquation du programme à votre situation, puis vous recontactera pour un court échange et la suite (notamment le paiement).</p>
+function sentHTML(p){
+  return `<div class="card stack" role="status"><h2 class="h-sub">${icon("check")} Votre demande est enregistrée</h2>
+    <p>Merci. Votre demande d’inscription au programme <b>${esc(p.title)}</b> est enregistrée sous la référence <b data-noi18n>${esc(ui.reqRef || "")}</b>. Elle est en attente de validation par l’équipe LE SEUIL.</p>
+    <p>${ui.reqEmail === false || ui.reqEmail === null ? "Notez votre référence : l’e-mail de confirmation n’a pas pu être envoyé pour le moment. L’équipe vous écrira à l’adresse indiquée." : "Un e-mail de confirmation vient de vous être envoyé. Pensez à vérifier vos courriers indésirables."}</p>
+    <p><b>Aucun paiement n’est nécessaire à cette étape.</b> Si votre demande est approuvée, vous recevrez un e-mail avec un lien sécurisé pour finaliser votre inscription.</p>
     ${ui.reqCare ? careHTML(ui.reqCare === "urgent") : ""}
-    <p class="small muted">Aucun compte n’a été créé. Votre accès vous sera envoyé par e-mail une fois votre demande validée.</p>
     <p class="small muted">${icon("phone")} ${esc(EVALUATION_NOTICE)}</p>
     <button class="btn btn-soft btn-sm" data-act="req-again" style="align-self:flex-start">Faire une autre demande</button></div>`;
+}
+function requestForm(p, sel){
+  if (!asmOn() && ui.reqSent !== p.slug) return requestFormSimple(p, sel);
+  if (ui.reqSent === p.slug) return sentHTML(p);
   const S_ = secs(), d = ui.asm || (ui.asm = {}), step = Math.min(ui.asmStep || 0, S_.length - 1), n = S_.length;
   return `<form class="card stack asm" id="requestform" novalidate aria-labelledby="req-h">
    <div class="stack" style="gap:6px"><h2 class="h-sub" id="req-h">Demande d’inscription · pré-évaluation</h2>
@@ -212,17 +216,13 @@ forms["requestform"] = async (f) => {
     phone: d.phone || null, message: d.message || null, is_adult: !!d.is_adult, consent: !!d.consent,
     evaluation: { _v: 2, form_version: "2026-11-09-brouillon", answers, scores: sc, attention: at, contact_ok: !!d.contact_ok, submitted_at: new Date().toISOString() } };
   const btn = f.querySelector('button[type="submit"]'); btn.disabled = true;
-  try { await api.submitRequest(r); ui.reqSent = r.programme_slug; ui.reqCare = at.urgent ? "urgent" : at.care ? "care" : null; ui.reqPlan = ""; ui.asm = {}; ui.asmStep = 0; rerender(); toast(DEMO ? "Maquette : demande enregistrée dans ce navigateur" : "Demande envoyée"); }
+  try { const res = await api.submitRequest(r); if (!res?.reference) throw new Error("non confirmé"); ui.reqRef = res.reference; ui.reqEmail = res.email; ui.reqSent = r.programme_slug; ui.reqCare = at.urgent ? "urgent" : at.care ? "care" : null; ui.reqPlan = ""; ui.asm = {}; ui.asmStep = 0; rerender(); toast(DEMO ? "Maquette : demande enregistrée dans ce navigateur" : "Demande enregistrée"); }
   catch (e) { console.error(e); const el = $("#rq-out"); el.textContent = "L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez. Vos réponses sont conservées sur cette page."; el.style.color = "var(--warn-fg)"; btn.disabled = false; }
 };
 
 /* ---------- Formulaire simple (en service tant que « pre_evaluation » est désactivé) ---------- */
 function requestFormSimple(p, sel){
-  if (ui.reqSent === p.slug) return `<div class="card stack" role="status"><h2 class="h-sub">${icon("check")} Votre demande a bien été transmise</h2>
-    <p>Merci. L’équipe LE SEUIL va examiner votre demande et l’adéquation du programme à votre situation. Nous vous recontacterons par e-mail pour la suite, notamment le paiement.</p>
-    <p class="small muted">Aucun compte n’a été créé. Votre accès vous sera envoyé par e-mail une fois votre demande validée.</p>
-    <p class="small muted">${icon("phone")} ${esc(EVALUATION_NOTICE)}</p>
-    <button class="btn btn-soft btn-sm" data-act="req-again" style="align-self:flex-start">Faire une autre demande</button></div>`;
+  if (ui.reqSent === p.slug) return sentHTML(p);
   return `<form class="card stack" id="requestform" novalidate aria-labelledby="req-h">
    <h2 class="h-sub" id="req-h">Demande d’inscription</h2>
    <p class="small muted">Cette demande ne crée pas de compte. Après vérification, l’équipe LE SEUIL vous recontacte par e-mail.</p>
@@ -260,6 +260,68 @@ async function submitSimple(f){
   if (!r.consent) return out("Merci d’accepter l’utilisation de vos informations pour traiter votre demande.");
   if (EVALUATION_QUESTIONS.some(q => q.required && !r.evaluation[q.k])) return out("Merci de répondre à la première question de votre évaluation initiale.");
   const btn = f.querySelector('button[type="submit"]'); btn.disabled = true;
-  try { await api.submitRequest(r); ui.reqSent = r.programme_slug; ui.reqPlan = ""; rerender(); toast(DEMO ? "Maquette : demande enregistrée dans ce navigateur" : "Demande envoyée"); }
-  catch (e) { console.error(e); out("L’envoi n’a pas abouti. Vérifiez votre connexion et réessayez."); btn.disabled = false; }
+  try { const res = await api.submitRequest(r); if (!res?.reference) throw new Error("non confirmé"); ui.reqRef = res.reference; ui.reqEmail = res.email; ui.reqCare = null; ui.reqSent = r.programme_slug; ui.reqPlan = ""; rerender(); toast(DEMO ? "Maquette : demande enregistrée dans ce navigateur" : "Demande enregistrée"); }
+  catch (e) { console.error(e); out("Votre demande n’a pas été enregistrée. " + (/Trop de demandes|invalide|requis|inconnu/i.test(e?.message || "") ? e.message + "." : "Vérifiez votre connexion et réessayez.")); btn.disabled = false; }
 }
+
+
+/* ---------- « Finaliser mon inscription » (lien sécurisé reçu après approbation) ---------- */
+const fmtF = (n) => n ? new Intl.NumberFormat("fr-FR").format(n).replace(/ | /g, " ") + " FCFA" : "—";
+const PAYST = { non_requis: "Aucun paiement demandé", en_attente: "En attente de paiement", en_cours: "Paiement en cours de confirmation", paye: "Payé", echoue: "Paiement échoué : vous pouvez réessayer", annule: "Aucun paiement demandé" };
+export function pFinalise(token){
+  const head = `<section class="page-head"><div class="wrap narrow stack" style="gap:8px;margin:0 auto"><span class="eyebrow">Inscription</span><h1 class="h-page">Finaliser mon inscription</h1></div></section>`;
+  if (!token) return head + `<section class="section"><div class="wrap narrow" style="margin:0 auto"><div class="card stack"><p>Ce lien n’est pas valide. Ouvrez le lien reçu par e-mail après l’approbation de votre demande, ou écrivez-nous à <a href="mailto:leseuil@orejeen.com">leseuil@orejeen.com</a>.</p></div></div></section>`;
+  if (ui.payFor !== token) { ui.payFor = token; ui.pay = undefined; ui.payErr = null; ui.payTx = null; }
+  if (ui.pay === undefined && !ui.payLoading) {
+    ui.payLoading = true;
+    api.checkout("checkout_refresh", token).then(d => { ui.pay = d; }).catch(e => { ui.pay = null; ui.payErr = e.message; }).finally(() => { ui.payLoading = false; rerender(); });
+  }
+  const d = ui.pay;
+  let body;
+  if (d === undefined) body = `<p class="muted">Chargement…</p>`;
+  else if (!d) body = `<p>${esc(ui.payErr || "Ce lien n’est pas valide.")}</p><p class="small muted">Besoin d’aide ? <a href="mailto:leseuil@orejeen.com">leseuil@orejeen.com</a></p>`;
+  else {
+    const active = d.status === "active", canPay = d.status === "acceptee" && !d.expired && d.payment_status !== "paye";
+    const pay = d.payment;
+    body = `<p>Bonjour ${esc(d.first_name)},</p>
+     <dl class="facts facts-wide fin-facts">
+      <div><dt>Programme approuvé</dt><dd>${esc(d.programme)}</dd></div>
+      <div><dt>Formule choisie</dt><dd>${esc(d.plan_label)}</dd></div>
+      <div><dt>Prix total</dt><dd><b>${fmtF(d.price_fcfa)}</b></dd></div>
+      <div><dt>Statut du paiement</dt><dd>${active ? "Payé" : esc(PAYST[d.payment_status] || d.payment_status)}</dd></div>
+      <div><dt>Référence de la demande</dt><dd data-noi18n>${esc(d.reference)}</dd></div></dl>
+     ${active ? `<div class="notice fin-ok" role="status">${icon("check")}<span><b>Votre inscription est active.</b> Vous avez reçu un e-mail pour accéder à votre espace (et, s’il s’agit de votre premier accès, choisir votre mot de passe).</span></div>
+        ${pay?.receipt_number ? `<div class="card-flat stack fin-receipt" style="gap:6px"><h2 class="h-card">Reçu n° <span data-noi18n>${esc(pay.receipt_number)}</span></h2>
+          <dl class="facts"><div><dt>Programme</dt><dd>${esc(d.programme)}</dd></div><div><dt>Formule</dt><dd>${esc(d.plan_label)}</dd></div><div><dt>Montant</dt><dd>${fmtF(pay.amount_fcfa)}</dd></div>
+          <div><dt>Date</dt><dd>${pay.paid_at ? new Date(pay.paid_at).toLocaleDateString("fr-FR") : ""}</dd></div><div><dt>Référence de transaction</dt><dd data-noi18n>${esc(pay.transaction_id)}</dd></div></dl>
+          <button class="btn btn-soft btn-sm" data-act="fin-print" style="align-self:flex-start">Imprimer le reçu</button></div>` : ""}
+        <button class="btn btn-primary" data-go="connexion" style="align-self:flex-start">Accéder à mon espace</button>`
+     : d.status === "acceptee" ? `
+        ${d.expired ? `<div class="notice">${icon("info")}<span>Ce lien a expiré. Écrivez-nous à <a href="mailto:leseuil@orejeen.com">leseuil@orejeen.com</a> pour en recevoir un nouveau.</span></div>` : ""}
+        ${d.payment_status === "en_cours" ? `<div class="notice">${icon("info")}<span>Un paiement est en cours de confirmation par le prestataire. Votre accès s’ouvrira dès sa confirmation ; aucun accès n’est donné avant.</span></div>` : ""}
+        ${canPay ? `<p class="small muted">Le paiement est traité sur la page sécurisée de notre prestataire : LE SEUIL ne reçoit et ne conserve jamais vos coordonnées bancaires ni vos codes de paiement mobile. Les moyens disponibles s’affichent sur cette page.</p>
+          <div class="row"><button class="btn btn-gold" data-act="fin-pay">Procéder au paiement</button>${d.payment_status === "en_cours" ? `<button class="btn btn-soft" data-act="fin-refresh">Vérifier mon paiement</button>` : ""}</div>` : ""}
+        ${ui.payTx && d.mode === "test" ? `<div class="card-flat stack fin-test" style="gap:8px"><b>Mode test — aucun argent réel</b><span class="small">Transaction <span data-noi18n>${esc(ui.payTx)}</span>. Simulation réservée à l’administratrice connectée.</span>
+          <div class="row"><button class="btn btn-soft btn-sm" data-act="fin-test" data-o="reussi">Simuler un paiement réussi</button><button class="btn btn-soft btn-sm" data-act="fin-test" data-o="en_attente">Simuler un paiement en attente</button><button class="btn btn-soft btn-sm" data-act="fin-test" data-o="echoue">Simuler un paiement échoué</button></div></div>` : ""}`
+     : `<div class="notice">${icon("info")}<span>${d.status === "refusee" || d.status === "orientation" ? "Cette demande n’a pas été approuvée : aucun paiement n’est possible." : d.status === "annulee" ? "Cette demande a été annulée : aucun paiement n’est possible." : "Votre demande n’est pas encore approuvée : le paiement n’est pas encore possible."}</span></div>`}
+     <p class="small muted" id="fin-out" role="status">${ui.payErr && d ? esc(ui.payErr) : ""}</p>`;
+  }
+  return head + `<section class="section"><div class="wrap narrow" style="margin:0 auto"><div class="card stack fin-card">${body}
+    <p class="small muted">${icon("phone")} LE SEUIL n’est pas un service d’urgence. En cas de danger immédiat, appelez le SAMU au 185.</p></div></div></section>`;
+}
+const finToken = () => ui.payFor;
+actions["fin-pay"] = async (b) => {
+  b.disabled = true; ui.payErr = null;
+  try {
+    const r = await api.checkout("checkout_start", finToken());
+    if (r.payment_url && /^https:\/\/[a-z0-9.-]*cinetpay\.com\//i.test(r.payment_url)) { location.href = r.payment_url; return; }
+    ui.payTx = r.transaction_id; ui.pay = await api.checkout("checkout_info", finToken()); rerender();
+  } catch (e) { ui.payErr = e.message; b.disabled = false; rerender(); }
+};
+actions["fin-refresh"] = async () => { try { ui.pay = await api.checkout("checkout_refresh", finToken()); } catch (e) { ui.payErr = e.message; } rerender(); };
+actions["fin-test"] = async (b) => {
+  try { await api.checkout("test_complete", finToken(), { transaction_id: ui.payTx, outcome: b.dataset.o }); ui.pay = await api.checkout("checkout_info", finToken()); if (b.dataset.o !== "en_attente") ui.payTx = b.dataset.o === "echoue" ? null : ui.payTx; }
+  catch (e) { ui.payErr = e.message; }
+  rerender();
+};
+actions["fin-print"] = () => window.print();
