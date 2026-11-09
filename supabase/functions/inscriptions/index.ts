@@ -29,7 +29,7 @@ const cors = {
 };
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-const fcfa = (n: number) => new Intl.NumberFormat("fr-FR").format(n).replace(/ | /g, " ") + " FCFA";
+const fcfa = (n: number) => new Intl.NumberFormat("fr-FR").format(n).replace(/\u202f|\u00a0/g, " ") + " FCFA";
 const escH = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const PLAN_LABEL: Record<string, string> = { autonome: "Formule 1 — Autonome", ecrit: "Formule 2 — Accompagnement écrit", appels: "Formule 3 — Accompagnement par appels" };
 

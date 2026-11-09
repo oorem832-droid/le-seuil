@@ -186,7 +186,7 @@ begin
   insert into public.enrolment_requests (programme_slug, plan, first_name, last_name, email, phone, message, is_adult, consent, evaluation, price_fcfa)
   values (p->>'programme_slug', v_plan, left(trim(p->>'first_name'),100), left(trim(p->>'last_name'),100), v_email,
           nullif(left(trim(coalesce(p->>'phone','')),40),''), nullif(left(coalesce(p->>'message',''),2000),''), true, true,
-          case when jsonb_typeof(p->'evaluation') = 'object' then p->'evaluation' else null end,
+          case when jsonb_typeof(p->'evaluation') = 'object' then p->'evaluation' else '{}'::jsonb end,
           (select price_fcfa from public.plan_prices where plan = v_plan))
   returning * into r;
   return jsonb_build_object('id', r.id, 'reference', r.reference, 'status', r.status);
