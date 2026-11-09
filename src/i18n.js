@@ -72,10 +72,10 @@ export function startI18n(){
 }
 export function translateNow(root = document.body){ translateTree(root); }
 
-const TITLE = { fr: "LE SEUIL — S’ouvrir pour mieux vivre", en: "LE SEUIL — Opening up to live better" };
+const TITLE = { fr: "LE SEUIL | Bien-être psychologique et programmes d’auto-assistance (TCC) à Abidjan", en: "LE SEUIL | Psychological wellbeing and CBT-inspired self-help programmes in Abidjan" };
 const DESC = {
-  fr: "LE SEUIL : plateforme de bien-être psychologique. Ressources fiables, Journal et programmes interactifs de six semaines inspirés de la TCC.",
-  en: "LE SEUIL: a psychological wellbeing platform. Reliable resources, a personal journal and interactive six-week programmes inspired by CBT."
+  fr: "Plateforme de bien-être psychologique à Abidjan : bibliothèque gratuite et programmes de 6 semaines inspirés des TCC pour l’anxiété, les peurs et le moral.",
+  en: "Psychological wellbeing platform in Abidjan: a free library and 6-week CBT-inspired programmes for anxiety, fears and low mood."
 };
 function applyDocLang(){
   const l = lang();
