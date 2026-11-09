@@ -21,10 +21,10 @@ export function header(){
   ${DEMO ? `<div class="demo-bar"><div class="wrap">${icon("info")}<span>Maquette de démonstration · données fictives · ne pas utiliser avec de vrais participants</span></div></div>` : ""}
   <header class="site"><div class="wrap" style="position:relative">
    <button class="brand" data-go="accueil" aria-label="LE SEUIL, accueil"><img src="${MARK}" alt=""><span>LE SEUIL</span></button>
-   <nav class="main" id="mainnav" aria-label="Navigation principale">${NAV.map(([k,l])=>`<button data-go="${k}" ${a===k?'aria-current="page"':""}>${l}</button>`).join("")}</nav>
+   <nav class="main" id="mainnav" aria-label="Navigation principale">${NAV.map(([k,l])=>`<button data-go="${k}" ${a===k?'aria-current="page"':""}>${l}</button>`).join("")}<button class="nav-account" data-go="${homeRoute()}">${icon("user")}${who}</button></nav>
    <div class="head-cta">
     <button class="btn btn-soft btn-sm lang-btn" data-act="lang" data-noi18n lang="${lang() === "en" ? "fr" : "en"}" aria-label="${lang() === "en" ? "Version française" : "English version"}"><span aria-hidden="true">${lang() === "en" ? "FR" : "EN"}</span></button>
-    <button class="btn btn-primary btn-sm" data-go="${homeRoute()}">${icon("user")}${who}</button>
+    <button class="btn btn-primary btn-sm head-account" data-go="${homeRoute()}" aria-label="${who}">${icon("user")}<span class="who-txt">${who}</span></button>
    </div>
    <button class="btn btn-soft btn-sm burger" data-act="burger" aria-controls="mainnav" aria-expanded="false" aria-label="Menu">${icon("menu")}</button>
   </div></header>`;
