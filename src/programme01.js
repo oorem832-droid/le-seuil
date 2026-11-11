@@ -580,7 +580,7 @@ export const PROGRAMME_01 = {
      "production": "Judie",
      "duration": "45 s",
      "transcript": "Vous avez commencé à distinguer les problèmes concrets des inquiétudes hypothétiques. Si le temps des inquiétudes vous a paru difficile, ce n’est pas grave. Vous pouvez ajuster votre pratique. La semaine prochaine, nous verrons comment agir lorsqu’un problème concret se présente.",
-     "url": "",
+     "url": "https://youtu.be/5dBd1N6TMLQ",
      "captions_url": ""
     },
     {
