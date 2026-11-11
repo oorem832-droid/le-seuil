@@ -3,7 +3,8 @@
 // is translated after rendering using src/i18n-en.json (exact phrases + patterns with {n} placeholders).
 // Articles and programme lessons are not translated: they stay in French and carry a short note.
 // The team area (accompagnante / admin) stays in French.
-import EN from "./i18n-en.json";
+// The English dictionary is loaded only for English visitors (smaller first download in French).
+let EN = { exact: {}, patterns: [] };
 
 const KEY = "orejeen-lang"; // shared with the other orejeen.com sites
 export function lang(){ try { return localStorage.getItem(KEY) === "en" ? "en" : "fr"; } catch(e) { return "fr"; } }
@@ -11,7 +12,12 @@ export function setLang(l){ try { localStorage.setItem(KEY, l); } catch(e) {} ap
 export const isEn = () => lang() === "en";
 
 const norm = s => s.replace(/\s+/g, " ").trim();
-const PATTERNS = EN.patterns.map(([src, en]) => [new RegExp(src), en]);
+let PATTERNS = [];
+let enReady = null;
+function loadEn(){
+  if (!enReady) enReady = import("./i18n-en.json").then(m => { EN = m.default; PATTERNS = EN.patterns.map(([src, en]) => [new RegExp(src), en]); if (isEn()) translateTree(document.body); });
+  return enReady;
+}
 
 export function tr(text){
   if (!isEn() || !text) return text;
@@ -58,6 +64,7 @@ function translateTree(root){
 let observer = null;
 export function startI18n(){
   applyDocLang();
+  if (isEn()) loadEn();
   if (observer) return;
   observer = new MutationObserver(muts => {
     if (!isEn()) return;

@@ -145,7 +145,11 @@ store.onEvent((evt) => {
   render(false);
 });
 startI18n();
-$("#app").innerHTML = `<div class="boot"><p class="muted">Chargement…</p></div>`;
+// Visite suivante sans connexion : la page s'affiche aussitôt avec les contenus gardés en mémoire.
+const hasSession = (() => { try { return Object.keys(localStorage).some(k => /^sb-.*-auth-token$/.test(k)); } catch (e) { return true; } })();
+const PUBLIC_FAST = /^(|accueil|programmes|programme-[a-z0-9-]+|bibliotheque.*|article-.*|apropos|decouvrir|aide|urgence|faq|contact|connexion|limites|confidentialite|conditions|protection|besoin-aide|trouver-mon-programme)$/;
+if (!store.DEMO && !hasSession && PUBLIC_FAST.test(location.hash.replace(/^#/, "")) && store.contentFromCache()) { try { render(false); } catch (e) { $("#app").innerHTML = `<div class="boot"><p class="muted">Chargement…</p></div>`; } }
+else $("#app").innerHTML = `<div class="boot"><p class="muted">Chargement…</p></div>`;
 store.boot().catch(err => { console.error(err); toast("Connexion au service impossible. Certains contenus peuvent manquer."); }).finally(() => {
   if (AUTH_HASH) { try { history.replaceState(null, "", location.pathname + "#premier-acces"); } catch (e) {} if (AUTH_ERROR && !S.user) toast("Ce lien a expiré ou a déjà été utilisé."); }
   render(true);

@@ -162,6 +162,7 @@ export function createLocalBackend() {
     async signOut() { uid = null; persist(); },
     async resetPassword() {}, async updatePassword() { const p = me(); if (p) { p.must_set_password = false; persist(); } },
 
+    async articlesFull() { return null; },
     async content(staff) {
       return {
         articles: T.articles.filter(a => staff || a.etat === 'publie').sort((a, b) => a.sort_order - b.sort_order).map(a => ({ uuid: a.id, id: a.slug, slug: a.slug, title: a.title, cat: a.category,

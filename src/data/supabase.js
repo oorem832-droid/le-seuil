@@ -18,6 +18,7 @@ export function createSupabaseBackend(url, key) {
     status: p.status, hue: p.cover_hue, measures: p.measures || [], questionnaires_enabled: p.questionnaires_enabled, sort: p.sort_order,
     category: p.category || '', public_intro: p.public_intro || '', public_goal: p.public_goal || '', benefits: p.benefits || [], format: p.format || '',
     library_categories: p.library_categories || [], open: p.open_for_requests !== false });
+  const ART_LIGHT = 'id, slug, title, category, excerpt, related, read_minutes, cover_hue, etat, featured, featured_order, sort_order, sensitive, image_url, image_alt, updated_at';
   const mapArt = (a) => ({ uuid: a.id, id: a.slug, slug: a.slug, title: a.title, cat: a.category, excerpt: a.excerpt, sections: a.sections || [],
     body: a.body || [], retenir: a.retenir || '', refs: a.references_list || [], related: a.related || [], read: a.read_minutes, hue: a.cover_hue,
     etat: a.etat, featured: a.featured, featured_order: a.featured_order, order: a.sort_order, sensitive: a.sensitive,
@@ -45,14 +46,19 @@ export function createSupabaseBackend(url, key) {
     async updatePassword(password) { ok(await sb.auth.updateUser({ password })); await sb.rpc('mark_password_set'); },
 
     // ---------- Contenus ----------
+    async articlesFull() {
+      return ok(await sb.from('articles').select('*').eq('etat', 'publie').order('sort_order')).map(mapArt);
+    },
     async content(staff) {
       const [arts, progs, plans, flags] = await Promise.all([
-        sb.from('articles').select('*').order('sort_order'),
+        // Liste légère (sans le texte des articles) : le texte complet n'est chargé que pour la Bibliothèque.
+        sb.from('articles').select(staff ? '*' : ART_LIGHT).order('sort_order'),
         sb.from('programmes').select('*').order('sort_order'),
         sb.from('plans').select('*').order('sort_order'),
         sb.from('feature_flags').select('key, enabled'),
       ]);
       return {
+        articles_full: !!staff,
         articles: ok(arts).filter(a => staff || a.etat === 'publie').map(mapArt),
         programmes: ok(progs).map(mapProg),
         videos: [],

@@ -25,12 +25,30 @@ export const needsMfa = () => (isTeam() || isStaff()) && S.aal?.nextLevel === 'a
 export const plan = () => S.enrolment?.plan || 'autonome';
 export const supportOpen = () => (plan() === 'ecrit' && C.flags.written_support) || (plan() === 'appels' && C.flags.support_calls);
 
+// Contenus publics gardés en mémoire du navigateur : la page s'affiche aussitôt à la visite suivante,
+// puis se met à jour en arrière-plan. Aucune donnée personnelle n'y est stockée.
+const CACHE_KEY = 'leseuil-contenus-v1';
+export function contentFromCache() {
+  try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (!c?.programmes?.length) return false;
+    Object.assign(C, c, { articles_full: false }); C.programme = C.programmes.find(p => p.slug === PROGRAMME_SLUG) || C.programmes[0] || null; C.weeks = []; return true; }
+  catch (e) { return false; }
+}
 export async function loadContent() {
   const staff = isStaff();
+  const fullBefore = C.articles_full && !staff ? C.articles : null;
   const c = await api.content(staff);
   Object.assign(C, c);
+  if (fullBefore) { C.articles = fullBefore; C.articles_full = true; }
   C.programme = C.programmes.find(p => p.slug === PROGRAMME_SLUG) || C.programmes[0] || null;
   C.weeks = [];
+  if (!DEMO && !staff) try { localStorage.setItem(CACHE_KEY, JSON.stringify({ articles: c.articles, programmes: c.programmes, plans: c.plans, flags: c.flags, videos: c.videos })); } catch (e) {}
+}
+// Texte complet des articles (Bibliothèque, lecture, recherche) : chargé une seule fois, à la demande.
+let fullPromise = null;
+export function ensureFullArticles() {
+  if (C.articles_full || DEMO) return Promise.resolve(false);
+  if (!fullPromise) fullPromise = api.articlesFull().then(list => { if (list) { C.articles = list; C.articles_full = true; } return true; }).catch(e => { console.error(e); fullPromise = null; return false; });
+  return fullPromise;
 }
 let preferredEnrolment = null;
 try { preferredEnrolment = localStorage.getItem('leseuil-programme'); } catch (e) {}

@@ -47,7 +47,9 @@ export function search(list, q){
   return list.filter(a => { const h = haystack(a); return toks.every(t => alternatives(t).some(alt => h.includes(alt))); });
 }
 
+const needFull = () => { if (!C.articles_full && !store.DEMO) { store.ensureFullArticles().then(ok => ok && rerender()); return true; } return false; };
 export function pLibrary(catFromRoute){
+  needFull();
   if (catFromRoute) { const c = CATEGORIES.find(x => catSlug(x) === catFromRoute); if (c) { ui.libCats = new Set([c]); } }
   ui.libCats = ui.libCats || new Set(); ui.libLimit = ui.libLimit || PAGE;
   const all = publishedArticles();
@@ -88,6 +90,7 @@ inputs.push(t => { if (t.id !== "libsearch") return false; ui.libQuery = t.value
 
 const SENSITIVE_BANNER = "Ces informations sont générales et ne remplacent pas une évaluation par un professionnel de santé qualifié. En cas de danger immédiat, contactez les services d’urgence locaux.";
 export function pArticle(slug){
+  const loadingBody = needFull();
   const all = publishedArticles();
   const staffPreview = store.isStaff() ? C.articles.find(x => x.slug === slug) : null;
   const a = all.find(x => x.slug === slug) || staffPreview;
@@ -110,6 +113,7 @@ export function pArticle(slug){
     <p class="lede">${esc(a.excerpt)}</p>
     ${(a.sections || []).map(s => `<h2>${esc(s.h)}</h2>${(s.p || []).map(p => `<p>${esc(p)}</p>`).join("")}`).join("")}
     ${!a.sections?.length ? (a.body || []).map(p => `<p>${esc(p)}</p>`).join("") : ""}
+    ${loadingBody && !a.sections?.length && !a.body?.length ? `<p class="muted">Chargement de l’article…</p>` : ""}
     ${a.retenir ? `<p class="retenir">${esc(a.retenir)}</p>` : ""}
    </article>
    <p class="small muted mention">LE SEUIL — Information générale, sans diagnostic ni remplacement des soins.</p>
