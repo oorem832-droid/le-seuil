@@ -609,3 +609,10 @@ input[type=tel],input[type=date]{font:inherit;color:var(--ink);background:var(--
 .fin-test{border:1.5px dashed var(--warn-fg)}
 .fin-ok{background:color-mix(in srgb,var(--ok) 14%,var(--surface));color:var(--ink)}
 @media print{header.site,footer,.btn,.fin-test,nav{display:none!important}.fin-receipt{border:1px solid #999}}
+
+/* Guide « Comprendre et agir » (contenu de référencement) */
+.seo-guide .card-flat h3{font-size:1.12rem}
+.seo-guide .card-flat p{color:var(--muted)}
+.faq-item{border-bottom:1px solid var(--line);padding:4px 0}
+.faq-item summary{cursor:pointer;font-weight:600;padding:10px 0;list-style-position:outside}
+.faq-item p{margin:0 0 12px;color:var(--muted)}

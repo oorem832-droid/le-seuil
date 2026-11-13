@@ -79,10 +79,10 @@ export function startI18n(){
 }
 export function translateNow(root = document.body){ translateTree(root); }
 
-const TITLE = { fr: "LE SEUIL | Bien-être psychologique et programmes d’auto-assistance (TCC) à Abidjan", en: "LE SEUIL | Psychological wellbeing and CBT-inspired self-help programmes in Abidjan" };
+const TITLE = { fr: "LE SEUIL | Bien-être psychologique à Abidjan", en: "LE SEUIL | Psychological wellbeing in Abidjan" };
 const DESC = {
-  fr: "Plateforme de bien-être psychologique à Abidjan : bibliothèque gratuite et programmes de 6 semaines inspirés des TCC pour l’anxiété, les peurs et le moral.",
-  en: "Psychological wellbeing platform in Abidjan: a free library and 6-week CBT-inspired programmes for anxiety, fears and low mood."
+  fr: "Programmes d’auto-assistance inspirés des TCC pour gérer l’anxiété, faire face aux peurs et retrouver le moral, et bibliothèque gratuite. Bien-être psychologique à Abidjan.",
+  en: "CBT-inspired self-help programmes to manage anxiety, face fears and lift low mood, plus a free library. Psychological wellbeing in Abidjan."
 };
 function applyDocLang(){
   const l = lang();

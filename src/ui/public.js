@@ -60,7 +60,7 @@ function welcomeVideo(){
     <p class="muted">Prenez quelques instants pour découvrir notre approche du bien-être psychologique et les ressources mises à votre disposition.</p></div>
    <div class="yt" id="welcome-yt">
     <button class="yt-poster" data-act="play-welcome" aria-label="Lire la vidéo de bienvenue">
-     <img src="welcome-${en ? "en" : "fr"}.jpg" alt="" width="1280" height="720" loading="lazy" decoding="async" draggable="false">
+     <img src="welcome-${en ? "en" : "fr"}.jpg" alt="${en ? "Welcome video: an introduction to LE SEUIL, a psychological wellbeing platform in Abidjan" : "Vidéo de bienvenue : présentation de LE SEUIL, plateforme de bien-être psychologique à Abidjan"}" width="1280" height="720" loading="lazy" decoding="async" draggable="false">
      <span class="yt-play" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
      <span class="yt-dur">1:34</span>
     </button>
@@ -80,7 +80,7 @@ export function pHome(){
   <section class="hero"><div class="wrap">
    <div class="stack-lg fade-in">
     <span class="eyebrow">Soutien · Compréhension · Équilibre</span>
-    <h1>Un premier pas vers votre <em>bien-être</em>.</h1>
+    <h1>Un premier pas vers votre <em>bien-être</em> psychologique, à Abidjan.</h1>
     <p class="lede">Bienvenue chez LE SEUIL, un espace pour comprendre ses émotions, découvrir des ressources fiables et avancer à son rythme grâce à des programmes interactifs de bien-être psychologique.</p>
     <div class="row"><button class="btn btn-primary" data-go="programmes">Explorer les programmes ${icon("arrow")}</button><button class="btn btn-ghost" data-go="bibliotheque">Découvrir nos ressources gratuites</button></div>
     <p class="signature">Franchir le seuil, et soudain, vous n’êtes plus seul.</p>
@@ -116,6 +116,30 @@ export function pHome(){
   <section class="section" style="padding-top:0"><div class="wrap">
    <div class="section-head"><div class="stack" style="gap:8px"><span class="eyebrow">La Bibliothèque · en accès libre</span><h2>À lire dans notre Bibliothèque</h2></div><button class="btn btn-soft" data-go="bibliotheque">Explorer la Bibliothèque ${icon("arrow")}</button></div>
    ${arts.length ? `<div class="grid g3">${arts.map(articleCard).join("")}</div>` : `<p class="muted">Les articles sont en cours de relecture et seront publiés prochainement.</p>`}
+  </div></section>
+
+  <section class="section"><div class="wrap seo-guide">
+   <div class="stack" style="gap:10px;max-width:68ch"><span class="eyebrow">Comprendre et agir</span>
+    <h2>Programmes d’auto-assistance inspirés des TCC</h2>
+    <p class="lede">Chaque programme dure six semaines et se suit en ligne, à votre rythme : de courtes leçons, des vidéos, des exercices pratiques et un suivi de vos progrès. Les thérapies cognitives et comportementales (TCC) partent d’une idée simple : nos pensées, nos émotions, nos sensations et nos comportements s’influencent les uns les autres. En agissant sur l’un, on peut faire bouger les autres.</p></div>
+   <div class="grid g3" style="margin-top:28px">
+    <article class="card-flat stack"><h3>Gestion de l’anxiété et des inquiétudes</h3><p>Apprendre à distinguer les problèmes concrets des inquiétudes hypothétiques, à se réserver un « temps des inquiétudes » et à résoudre les problèmes étape par étape, plutôt que de tourner en rond.</p></article>
+    <article class="card-flat stack"><h3>Faire face aux peurs et à l’évitement</h3><p>Comprendre comment l’évitement soulage sur le moment mais entretient la peur, puis s’exposer progressivement aux situations redoutées, par petites étapes que vous choisissez.</p></article>
+    <article class="card-flat stack"><h3>Retrouver le moral et l’élan</h3><p>Observer le lien entre ce que l’on fait et ce que l’on ressent, puis réintroduire peu à peu des activités qui comptent pour vous, de façon réaliste.</p></article>
+   </div>
+   <div class="grid g2" style="margin-top:40px;gap:40px;align-items:start">
+    <div class="stack" style="gap:10px"><h2 class="h-sub">Le bien-être psychologique à Abidjan, en accès simple</h2>
+     <p>La Bibliothèque de LE SEUIL est gratuite : des articles en français pour mieux comprendre le stress, l’anxiété, le sommeil, le moral ou les relations, écrits sans jargon. Les programmes, eux, se suivent depuis un téléphone ou un ordinateur, depuis Abidjan comme d’ailleurs en Côte d’Ivoire.</p>
+     <p>Selon la formule choisie, vous avancez seul·e ou avec un accompagnement écrit ou par appels. LE SEUIL ne pose pas de diagnostic et ne remplace ni une psychothérapie ni un suivi médical : si vos besoins dépassent ce cadre, nous vous orientons vers les structures adaptées.</p>
+     <div class="row"><button class="btn btn-soft" data-go="programmes">Voir les programmes ${icon("arrow")}</button><button class="btn btn-ghost" data-go="bibliotheque">Lire la Bibliothèque</button></div></div>
+    <div class="stack" style="gap:8px"><h2 class="h-sub">Questions fréquentes</h2>
+     ${[["Qu’est-ce qu’un programme d’auto-assistance ?","Un parcours structuré que vous suivez vous-même : chaque semaine, une leçon courte et des exercices pour mettre en pratique des outils concrets dans votre quotidien."],
+        ["LE SEUIL remplace-t-il un psychologue ?","Non. LE SEUIL propose de la psychoéducation et de l’auto-assistance. Il ne remplace ni une consultation avec un psychologue ou un psychiatre, ni un traitement."],
+        ["Combien de temps dure un programme ?","Six semaines, à raison d’une leçon par semaine. Vous gardez ensuite l’accès à vos exercices et à vos notes."],
+        ["Faut-il habiter à Abidjan ?","Non. Tout se passe en ligne ; LE SEUIL est pensé pour le contexte ivoirien et reste accessible où que vous soyez."],
+        ["Que faire en cas d’urgence ?","LE SEUIL n’est pas un service d’urgence. En Côte d’Ivoire, en cas de danger immédiat, appelez le SAMU au 185 ou rendez-vous aux urgences les plus proches."]]
+       .map(([q,a])=>`<details class="faq-item"><summary>${q}</summary><p>${a}</p></details>`).join("")}</div>
+   </div>
   </div></section>
 
   <section class="section band"><div class="wrap founder">
